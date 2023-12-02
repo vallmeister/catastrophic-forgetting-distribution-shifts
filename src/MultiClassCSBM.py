@@ -1,5 +1,3 @@
-from collections import Counter
-
 import numpy as np
 import torch
 from numpy import random
@@ -31,12 +29,12 @@ class MultiClassCSBM:
 
         self.q_hom = q_hom
         self.q_het = q_het
-        self.adjacency = self.generate_edges()
 
-        self.graph = Data()
+        self.edge_sources = []
+        self.edge_targets = []
+        self.generate_edges()
 
-    def generate_graph(self):
-        pass
+        self.graph = self.build_graph()
 
     # TODO: Implement Gram-Schmitt?
     def initialize_means(self):
@@ -61,17 +59,23 @@ class MultiClassCSBM:
             node_features = random.multivariate_normal(class_mean, cov, 1)
             self.X = np.concatenate((self.X, node_features))
 
-    def generate_edges(self):
-        adjacency_matrix = np.zeros((self.n, self.n))
+    def generate_edges(self, t=0):
         for i in range(self.n):
             for j in range(self.n):
                 if i == j:
                     continue
-                elif self.y[i] == self.y[j]:
-                    adjacency_matrix[i][j] = random.binomial(1, self.q_hom)
-                else:
-                    adjacency_matrix[i][j] = random.binomial(1, self.q_het)
-        return adjacency_matrix
+                elif self.y[i] == self.y[j] and random.binomial(1, self.q_hom):
+                    self.edge_sources.append(i)
+                    self.edge_targets.append(j)
+                elif self.y[i] != self.y[j] and random.binomial(1, self.q_het):
+                    self.edge_sources.append(i)
+                    self.edge_targets.append(j)
+
+    def build_graph(self):
+        edge_index = torch.tensor([self.edge_sources, self.edge_targets], dtype=torch.long)
+        x = torch.tensor(self.X, dtype=torch.float)
+        y = torch.tensor(self.y, dtype=torch.long)
+        return Data(x=x, edge_index=edge_index, y=y)
 
     def evolve(self):
         pass
