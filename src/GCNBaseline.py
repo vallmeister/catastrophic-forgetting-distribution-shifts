@@ -7,11 +7,10 @@ from src.MultiClassCSBM import MultiClassCSBM
 
 class GCN(torch.nn.Module):
 
-    def __init__(self):
+    def __init__(self, dataset):
         super().__init__()
-        dataset = MultiClassCSBM().graph
         self.conv1 = GCNConv(dataset.num_node_features, 16)
-        self.conv2 = GCNConv(16, 20)
+        self.conv2 = GCNConv(16, dataset.num_classes)
 
     def forward(self, data):
         x, edge_index = data.x, data.edge_index
