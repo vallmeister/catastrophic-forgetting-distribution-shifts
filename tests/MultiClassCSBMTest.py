@@ -18,16 +18,22 @@ class MultiClassCSBMTest(unittest.TestCase):
                 self.assertEquals(linalg.norm(self.csbm.means[i] - self.csbm.means[j]), math.sqrt(2))
 
     def test_number_of_nodes(self):
-        self.assertEquals(self.csbm.graph.num_nodes, 5000)
+        self.assertEquals(self.csbm.data.num_nodes, 5000)
 
     def test_number_of_node_features(self):
-        self.assertEquals(self.csbm.graph.num_node_features, 100)
+        self.assertEquals(self.csbm.data.num_node_features, 100)
 
     def test_self_loops(self):
-        self.assertFalse(self.csbm.graph.has_self_loops())
+        self.assertFalse(self.csbm.data.has_self_loops())
 
     def test_is_directed(self):
-        self.assertTrue(self.csbm.graph.is_directed())
+        self.assertTrue(self.csbm.data.is_directed())
 
     # def test_num_classes(self):
     #     self.assertEquals(self.csbm.graph.num_classes, 20)
+
+    def test_no_edges_from_old_to_new_nodes(self):
+        new_csbm = MultiClassCSBM(n=100, classes=10, dimensions=20)
+        new_csbm.evolve()
+        for u, v in zip(new_csbm.edge_sources, new_csbm.edge_targets):
+            self.assertFalse(u < 100 <= v)

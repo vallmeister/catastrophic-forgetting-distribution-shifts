@@ -13,13 +13,13 @@ class MultiClassCSBM:
         self.dimensions = dimensions
 
         self.X = np.empty([0, dimensions])
-        self.y = np.empty([0])
+        self.y = np.empty([0], dtype=np.int32)
 
         if class_distribution:
             self.p = class_distribution
         else:
             self.p = np.full((classes,), 1 / classes)
-        self.y = self.draw_class_labels()
+        self.draw_class_labels()
 
         if means:
             self.means = means
@@ -34,7 +34,12 @@ class MultiClassCSBM:
         self.edge_targets = []
         self.generate_edges()
 
-        self.graph = self.build_graph()
+        self.data = None
+        self.build_graph()
+        self.train_mask = None
+        self.test_mask = None
+        self.tau = 1
+        self.set_masks()
 
     # TODO: Implement Gram-Schmitt?
     def initialize_means(self):
@@ -49,19 +54,22 @@ class MultiClassCSBM:
             self.means[i] = self.means[i] / np.linalg.norm(self.means[i])
 
     def draw_class_labels(self):
-        return random.choice(list(range(self.classes)), self.n, p=self.p)
+        new_labels = random.choice(list(range(self.classes)), self.n, p=self.p)
+        self.y = np.concatenate((self.y, new_labels))
 
     def draw_node_features(self, t=0):
         cov = self.sigma_square * np.eye(self.dimensions)
-        for i in range(self.n):
+        offset = t * self.n
+        for i in range(offset, offset + self.n):
             class_label = self.y[i]
             class_mean = self.means[class_label]
             node_features = random.multivariate_normal(class_mean, cov, 1)
             self.X = np.concatenate((self.X, node_features))
 
     def generate_edges(self, t=0):
-        for i in range(self.n):
-            for j in range(self.n):
+        offset = self.n * t
+        for i in range(offset, offset + self.n):
+            for j in range((t + 1) * self.n):
                 if i == j:
                     continue
                 elif self.y[i] == self.y[j] and random.binomial(1, self.q_hom):
@@ -75,7 +83,19 @@ class MultiClassCSBM:
         edge_index = torch.tensor([self.edge_sources, self.edge_targets], dtype=torch.long)
         x = torch.tensor(self.X, dtype=torch.float)
         y = torch.tensor(self.y, dtype=torch.long)
-        return Data(x=x, edge_index=edge_index, y=y)
+        self.data = Data(x=x, edge_index=edge_index, y=y)
 
     def evolve(self):
-        pass
+        self.draw_class_labels()
+        self.draw_node_features(self.tau)
+        self.generate_edges(self.tau)
+        self.build_graph()
+        self.set_masks()
+        self.tau += 1
+
+    def set_masks(self, train=0.8, validation=0.1, test=0.1):
+        num_nodes = self.n * self.tau
+        self.train_mask = torch.zeros(num_nodes, dtype=torch.bool)
+        self.train_mask[:int(train * num_nodes)] = 1
+        self.test_mask = torch.zeros(num_nodes, dtype=torch.bool)
+        self.test_mask[int(train * num_nodes):] = 1
