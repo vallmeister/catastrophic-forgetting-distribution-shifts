@@ -33,7 +33,7 @@ class MultiClassCSBMTest(unittest.TestCase):
     #     self.assertEquals(self.csbm.graph.num_classes, 20)
 
     def test_no_edges_from_old_to_new_nodes(self):
-        new_csbm = MultiClassCSBM(n=100, classes=10, dimensions=20)
-        new_csbm.evolve()
-        for u, v in zip(new_csbm.edge_sources, new_csbm.edge_targets):
+        evolving_csbm = MultiClassCSBM(n=100, classes=10, dimensions=20)
+        evolving_csbm.evolve()
+        for u, v in zip(evolving_csbm.edge_sources, evolving_csbm.edge_targets):
             self.assertFalse(u < 100 <= v)

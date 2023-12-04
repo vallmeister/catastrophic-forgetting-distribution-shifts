@@ -36,8 +36,6 @@ class MultiClassCSBM:
 
         self.data = None
         self.build_graph()
-        self.train_mask = None
-        self.test_mask = None
         self.tau = 1
         self.set_masks()
 
@@ -60,11 +58,12 @@ class MultiClassCSBM:
     def draw_node_features(self, t=0):
         cov = self.sigma_square * np.eye(self.dimensions)
         offset = t * self.n
+        node_features = np.zeros((self.n, self.dimensions))
         for i in range(offset, offset + self.n):
             class_label = self.y[i]
             class_mean = self.means[class_label]
-            node_features = random.multivariate_normal(class_mean, cov, 1)
-            self.X = np.concatenate((self.X, node_features))
+            node_features[i - offset] = random.multivariate_normal(class_mean, cov, 1)
+        self.X = np.concatenate((self.X, node_features))
 
     def generate_edges(self, t=0):
         offset = self.n * t
@@ -95,7 +94,7 @@ class MultiClassCSBM:
 
     def set_masks(self, train=0.8, validation=0.1, test=0.1):
         num_nodes = self.n * self.tau
-        self.train_mask = torch.zeros(num_nodes, dtype=torch.bool)
-        self.train_mask[:int(train * num_nodes)] = 1
-        self.test_mask = torch.zeros(num_nodes, dtype=torch.bool)
-        self.test_mask[int(train * num_nodes):] = 1
+        self.data.train_mask = torch.zeros(num_nodes, dtype=torch.bool)
+        self.data.train_mask[:int(train * num_nodes)] = 1
+        self.data.test_mask = torch.zeros(num_nodes, dtype=torch.bool)
+        self.data.test_mask[int(test * num_nodes):] = 1

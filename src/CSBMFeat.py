@@ -1,4 +1,6 @@
-from src.MultiClassCSBM import MultiClassCSBM
+import numpy as np
+
+from MultiClassCSBM import MultiClassCSBM
 
 
 class CSBMFeat(MultiClassCSBM):
@@ -6,5 +8,15 @@ class CSBMFeat(MultiClassCSBM):
                  dimensions=100):
         super().__init__(n, class_distribution, means, q_hom, q_het, sigma_square, classes, dimensions)
 
-    def update(self):
-        pass
+    def evolve(self):
+        self.update_means()
+        super().evolve()
+
+    def update_means(self):
+        new_means = np.zeros((self.classes, self.dimensions))
+        for i in range(self.classes):
+            mean, next_mean = self.means[i], self.means[(i + 1) % self.classes]
+            new_mean = mean + self.sigma_square * (next_mean - mean)
+            new_mean /= np.linalg.norm(new_mean)
+            new_means[i] = new_mean
+        self.means = new_means
