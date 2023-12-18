@@ -18,7 +18,7 @@ class CSBMFeat(MultiClassCSBM):
         for i in range(self.classes):
             curr_mean = self.means[i]
             initial_mean, next_initial_mean = self.initial_means[i], self.initial_means[(i + 1) % self.classes]
-            new_mean = curr_mean + self.sigma_square * (next_initial_mean - initial_mean)
+            new_mean = curr_mean + 0.05 * (next_initial_mean - initial_mean)
             new_mean /= np.linalg.norm(new_mean)
             new_means[i] = new_mean
         self.means = new_means
