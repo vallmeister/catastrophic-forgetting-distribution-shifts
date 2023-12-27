@@ -12,4 +12,4 @@ class CSBMhet(MultiClassCSBM):
         super().evolve()
 
     def update_q_het(self):
-        self.q_het += 0.1
+        self.q_het = max(0.95, self.q_het + 0.1)

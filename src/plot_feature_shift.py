@@ -17,9 +17,9 @@ from metrics import mmd_rbf, total_variation_distance
 # In[2]:
 
 
-dimensions = 100
+dimensions = 80
 gamma = 2 * dimensions
-n = 5000
+n = 4000
 classes = 20
 
 
@@ -104,7 +104,7 @@ def mmd_per_class(csbm):
 
 
 # initialize
-time_steps = np.arange(0, 21)
+time_steps = []
 mean_distance_from_initialization = []
 mean_pairwise_distance_all = []
 mean_pairwise_distance_neighbors = []
@@ -115,7 +115,8 @@ mmd_from_first_to_tth_nodes_low = []
 # simulate
 csbm_feat_high = CSBMFeat(n=n, dimensions=dimensions, sigma_square=0.1, classes=classes)
 csbm_feat_low = CSBMFeat(n=n, dimensions=dimensions, sigma_square=1e-20, classes=classes)
-for _ in range(21):
+for t in range(13):
+    time_steps.append(t)
     mmd_from_first_to_tth_nodes_high.append(mmd_per_class(csbm_feat_high))
     mmd_from_first_to_tth_nodes_low.append(mmd_per_class(csbm_feat_low))
     mean_pairwise_distance_all.append(get_pairwise_mean_distance(csbm_feat_high))
@@ -161,12 +162,12 @@ plt.savefig('class_means.pdf', format='pdf')
 plt.close()
 
 
-# In[ ]:
+# In[10]:
 
 
 time_steps = []
 tvs = []
-csbm = CSBMCl(classes=classes)
+csbm = CSBMCl(n=n, classes=classes)
 initial_distribution = csbm.p
 for t in range(15):
     time_steps.append(t)
@@ -177,7 +178,7 @@ plt.figure(figsize=(12, 6))
 plt.title('Class label shift over time')
 plt.plot(time_steps, tvs, marker='o', linestyle='-', color='b')
 plt.xlabel('Time Steps')
-plt.ylabel('Class-label shift')
+plt.ylabel('TVD')
 plt.grid(True)
 plt.savefig('class_label_shift.pdf', format='pdf')
 #plt.show()
