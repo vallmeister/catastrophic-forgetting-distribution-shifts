@@ -7,7 +7,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import math
-from collections import Counter
 from MultiClassCSBM import MultiClassCSBM
 from CSBMFeat import CSBMFeat
 from CSBMCl import CSBMCl
@@ -17,9 +16,9 @@ from metrics import mmd_rbf, total_variation_distance
 # In[2]:
 
 
-dimensions = 80
+dimensions = 100
 gamma = 2 * dimensions
-n = 4000
+n = 5000
 classes = 20
 
 
@@ -111,10 +110,13 @@ mean_pairwise_distance_neighbors = []
 mean_pairwise_distance_non_neighbors = [] 
 mmd_from_first_to_tth_nodes_high = []
 mmd_from_first_to_tth_nodes_low = []
+mmd_from_first_to_tth_nodes_constant = []
 
 # simulate
-csbm_feat_high = CSBMFeat(n=n, dimensions=dimensions, sigma_square=0.1, classes=classes)
+csbm_feat_high = CSBMFeat(n=n, dimensions=dimensions, sigma_square=0.01, classes=classes)
 csbm_feat_low = CSBMFeat(n=n, dimensions=dimensions, sigma_square=1e-20, classes=classes)
+csbm_constant = MultiClassCSBM(n=n, dimensions=dimensions, sigma_square=0.1, classes=classes)
+
 for t in range(13):
     time_steps.append(t)
     mmd_from_first_to_tth_nodes_high.append(mmd_per_class(csbm_feat_high))
@@ -123,8 +125,10 @@ for t in range(13):
     mean_distance_from_initialization.append(get_mean_initialiation_distance(csbm_feat_high))
     mean_pairwise_distance_neighbors.append(get_pairwise_neighbor_mean_distance(csbm_feat_high))
     mean_pairwise_distance_non_neighbors.append(get_pairwise_non_neighbor_mean_distance(csbm_feat_high))
+    mmd_from_first_to_tth_nodes_constant.append(mmd_per_class(csbm_constant))
     csbm_feat_high.evolve()
     csbm_feat_low.evolve()
+    csbm_constant.evolve()
 
 # plot
 plt.figure(figsize=(12, 6))
@@ -132,6 +136,7 @@ plt.title(r'Feature-shift over time for different $\sigma^{2}$')
 
 plt.plot(time_steps, mmd_from_first_to_tth_nodes_high, marker='o', linestyle='-', color='b', label=r'$\sigma^{2}=0.1$')
 plt.plot(time_steps, mmd_from_first_to_tth_nodes_low, marker='o', linestyle='-', color='r', label=r'$\sigma^{2}=1e-20$')
+plt.plot(time_steps, mmd_from_first_to_tth_nodes_constant, marker='o', linestyle='-', color='black', label='CSBM w/o shift')
 plt.xlabel('Time Steps')
 plt.ylabel('Feature-shift')
 plt.grid(True)
