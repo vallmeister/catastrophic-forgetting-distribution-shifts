@@ -89,8 +89,8 @@ class MultiClassCSBM:
         self.draw_node_features(self.tau)
         self.generate_edges(self.tau)
         self.build_graph()
-        self.set_masks()
         self.tau += 1
+        self.set_masks()
 
     def set_masks(self, train=0.8, validation=0.1, test=0.1):
         num_nodes = self.n * self.tau

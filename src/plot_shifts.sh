@@ -8,4 +8,4 @@
 #SBATCH --output=testout.log
 #SBATCH --error=testerr.log
 
-python plot_shifts.py
+python plot_structure_shift.py

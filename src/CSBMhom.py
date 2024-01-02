@@ -8,8 +8,8 @@ class CSBMhom(MultiClassCSBM):
         super().__init__(n, class_distribution, means, q_hom, q_het, sigma_square, classes, dimensions)
 
     def evolve(self):
-            self.update_q_hom()
-            super().evolve()
+        self.update_q_hom()
+        super().evolve()
 
     def update_q_hom(self):
-        self.q_hom = max(0.95, self.q_hom + 0.1)
+        self.q_hom = min(0.95, self.q_hom + 0.1)
