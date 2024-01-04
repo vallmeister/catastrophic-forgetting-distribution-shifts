@@ -1,6 +1,12 @@
 import numpy as np
-from numpy.linalg import norm
 from sklearn import metrics
+
+
+def mmd_linear(X, Z):
+    XX = np.dot(X, X.T)
+    ZZ = np.dot(Z, Z.T)
+    XZ = np.dot(X, Z.T)
+    return XX.mean() + ZZ.mean() - 2 * XZ.mean()
 
 
 def mmd_rbf(X, Z, gamma=1.0):
