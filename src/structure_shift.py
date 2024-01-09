@@ -24,7 +24,7 @@ from torch_geometric.utils import homophily
 
 dimensions = 100
 gamma = 2 * dimensions
-n = 5000
+n = 2000
 classes = 20
 training_time = 100
 
@@ -33,6 +33,7 @@ training_time = 100
 
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
+printnt(device)
 
 
 # In[4]:
@@ -90,7 +91,7 @@ def model_training(csbm):
         loss = train(model, loader, optimizer)
         acc = test(model, data)
         accuracy = max(acc, accuracy)
-    return model.embedding.weight.detach().numpy()
+    return model.embedding.weight.cpu().detach().numpy()
 
 
 # In[7]:
@@ -188,7 +189,7 @@ plt.savefig('structure_shift_linear_all.pdf', format='pdf')
 plt.close()
 
 
-# In[11]:
+# In[10]:
 
 
 fig, axes = plt.subplots(nrows=1, ncols=3, figsize=(18, 6))
