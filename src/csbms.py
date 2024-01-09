@@ -1,3 +1,5 @@
+from collections import defaultdict
+
 import numpy as np
 import torch
 from numpy import random
@@ -15,14 +17,18 @@ class MultiClassCSBM:
         self.X = np.empty([0, dimensions])
         self.y = np.empty([0], dtype=np.int32)
 
-        if class_distribution:
+        if class_distribution and len(class_distribution) == classes:
             self.p = class_distribution
         else:
             self.p = np.full((classes,), 1 / classes)
         self.draw_class_labels()
 
         if means:
-            self.means = means
+            if len(means) == classes and all(np.dot(m1, m2).round(10) == 0.0 for m1, m2 in means if m1 != m2):
+                self.means = means
+            else:
+                # TODO: Gram-Schmitt?
+                pass
         else:
             self.initialize_means()
         self.draw_node_features()
@@ -39,7 +45,6 @@ class MultiClassCSBM:
         self.build_graph()
         self.set_masks()
 
-    # TODO: Implement Gram-Schmitt?
     def initialize_means(self):
         self.means = np.zeros((self.classes, self.dimensions))
         ones_per_mean = self.dimensions / self.classes
@@ -98,3 +103,40 @@ class MultiClassCSBM:
         self.data.train_mask[:int(train * num_nodes)] = 1
         self.data.test_mask = torch.zeros(num_nodes, dtype=torch.bool)
         self.data.test_mask[int(test * num_nodes):] = 1
+
+
+class StructureCSBM(MultiClassCSBM):
+
+    def __init__(self, n=5000, class_distribution=None, means=None, q_hom=0.05, q_het=0.01, sigma_square=0.1,
+                 classes=16, dimensions=128):
+        self.node_degrees = defaultdict(int)
+        self.max_degree = 1
+        super().__init__(n,
+                         class_distribution,
+                         means,
+                         q_hom,
+                         q_het,
+                         sigma_square,
+                         classes,
+                         dimensions)
+
+    def generate_edges(self, t=0):
+        start = self.n * t
+        end = start + self.n
+        for i in range(start, end):
+            for j in range(end):
+                if i == j:
+                    continue
+                deg = self.node_degrees[j]
+                q_hom = max(self.q_hom, 0.5 * deg / self.max_degree)
+                q_het = max(self.q_het, 0.1 * deg / self.max_degree)
+                if self.y[i] == self.y[j] and random.binomial(1, q_hom):
+                    self.edge_sources.append(i)
+                    self.edge_targets.append(j)
+                    self.node_degrees[j] += 1
+                    self.max_degree = max(self.max_degree, self.node_degrees[j])
+                elif self.y[i] != self.y[j] and random.binomial(1, q_het):
+                    self.edge_sources.append(i)
+                    self.edge_targets.append(j)
+                    self.node_degrees[j] += 1
+                    self.max_degree = max(self.max_degree, self.node_degrees[j])

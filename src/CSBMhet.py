@@ -1,4 +1,4 @@
-from MultiClassCSBM import MultiClassCSBM
+from csbms import MultiClassCSBM
 
 
 class CSBMhet(MultiClassCSBM):

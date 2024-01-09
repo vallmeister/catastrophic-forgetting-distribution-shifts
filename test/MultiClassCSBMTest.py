@@ -1,7 +1,7 @@
 import math
 import unittest
 from numpy import linalg
-from src.MultiClassCSBM import MultiClassCSBM
+from src.csbms import MultiClassCSBM
 
 
 class MultiClassCSBMTest(unittest.TestCase):
@@ -28,9 +28,6 @@ class MultiClassCSBMTest(unittest.TestCase):
 
     def test_is_directed(self):
         self.assertTrue(self.csbm.data.is_directed())
-
-    # def test_num_classes(self):
-    #     self.assertEquals(self.csbm.graph.num_classes, 20)
 
     def test_no_edges_from_old_to_new_nodes(self):
         evolving_csbm = MultiClassCSBM(n=100, classes=10, dimensions=20)

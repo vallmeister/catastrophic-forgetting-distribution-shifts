@@ -5,7 +5,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import math
-from MultiClassCSBM import MultiClassCSBM
+from csbms import MultiClassCSBM
 from CSBMFeat import CSBMFeat
 from CSBMCl import CSBMCl
 from metrics import mmd_linear, mmd_rbf, total_variation_distance

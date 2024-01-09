@@ -1,6 +1,6 @@
 import numpy as np
 
-from MultiClassCSBM import MultiClassCSBM
+from csbms import MultiClassCSBM
 
 
 class CSBMCl(MultiClassCSBM):

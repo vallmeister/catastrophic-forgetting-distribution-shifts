@@ -2,7 +2,7 @@ import torch
 import torch.nn.functional as F
 from torch_geometric.nn import GCNConv
 
-from src.MultiClassCSBM import MultiClassCSBM
+from src.csbms import MultiClassCSBM
 
 
 class GCN(torch.nn.Module):
