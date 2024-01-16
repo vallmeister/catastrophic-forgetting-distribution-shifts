@@ -48,8 +48,8 @@ print(device)
 
 
 csbm_constant = MultiClassCSBM(n=n, dimensions=d, classes=c, q_hom=q1, q_het=q2)
-csbm_hom = CSBMhom(n=n, dimensions=d, classes=c, q_hom=q1, q_het=q2)
-csbm_het = CSBMhet(n=n, dimensions=d, classes=c, q_hom=q1, q_het=q2)
+csbm_hom = CSBMhom(n=n, dimensions=d, classes=c, q_het=q2)
+csbm_het = CSBMhet(n=n, dimensions=d, classes=c, q_hom=q1)
 csbm_struct = StructureCSBM(n=n, dimensions=d, classes=c)
 csbms = [csbm_constant, csbm_hom, csbm_het, csbm_struct]
 
@@ -105,11 +105,14 @@ def get_node_embeddings(csbm):
             max_iter=150,
         )
         return acc
-    
+    max_loss = 0
+    max_acc = 0
     for epoch in range(training_time):
         loss = train()
+        max_loss = max(max_loss, loss)
         acc = test()
-        print(f'Epoch: {epoch:03d}, Loss: {loss:.4f}, Acc: {acc:.4f}')
+        max_acc = max(acc, max_acc)
+    print(f'Loss: {max_loss:.4f}, Acc: {max_acc:.4f}')
     return model.embedding.weight.cpu().detach().numpy()
 
 
@@ -154,17 +157,17 @@ plt.plot(time_steps, mmds_hom, marker='o', linestyle='-', color='r', label='CSBM
 plt.plot(time_steps, mmds_het, marker='o', linestyle='-', color='orange', label='CSBM-Het')
 plt.plot(time_steps, mmds_struct, marker='o', linestyle='-', color='blue', label='CSBM-Struct')
 
-plt.title(r'Graph structure-shift for different CsBMs')
+plt.title(r'Graph structure-shift for different CSBMs')
 plt.xlabel('Time Steps')
 plt.ylabel(r'$MMD^{2}$ with linear kernel')
 plt.grid(True)
 plt.legend(loc='lower right')
 plt.savefig('structure_shift_all.pdf', format='pdf')
-plt.show()
+#plt.show()
 plt.close()
 
 
-# In[12]:
+# In[10]:
 
 
 fig, axes = plt.subplots(nrows=4, ncols=1, figsize=(12, 20))
@@ -200,18 +203,6 @@ for ax in axes:
     ax.legend(loc='upper left')
     ax.grid(True)
 plt.savefig('structure_shift_separate.pdf', format='pdf')
-plt.show()
-plt.close()
-
-
-# In[13]:
-
-
-plt.hist(csbm_struct.node_degrees.values(), bins='auto', alpha=0.7, color='blue', edgecolor='black')
-plt.xlabel('Values')
-plt.ylabel('Frequency')
-plt.title('Histogram of Your Data')
-plt.savefig('csbm_struct_histogram.pdf', format='pdf')
-plt.show()
+#plt.show()
 plt.close()
 

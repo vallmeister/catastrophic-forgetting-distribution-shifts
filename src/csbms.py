@@ -127,16 +127,19 @@ class StructureCSBM(MultiClassCSBM):
             for j in range(end):
                 if i == j:
                     continue
-                deg = self.node_degrees[j]
-                q_hom = max(self.q_hom, 0.5 * deg / self.max_degree)
-                q_het = max(self.q_het, 0.1 * deg / self.max_degree)
+                # deg = self.node_degrees[j]
+                # q_hom = max(self.q_hom, 0.5 * deg / self.max_degree)
+                # q_het = max(self.q_het, 0.1 * deg / self.max_degree)
+                tau = j // self.n + 1
+                q_hom = 0.5 / tau
+                q_het = 0.1 / tau
                 if self.y[i] == self.y[j] and random.binomial(1, q_hom):
                     self.edge_sources.append(i)
                     self.edge_targets.append(j)
-                    self.node_degrees[j] += 1
-                    self.max_degree = max(self.max_degree, self.node_degrees[j])
+                    # self.node_degrees[j] += 1
+                    # self.max_degree = max(self.max_degree, self.node_degrees[j])
                 elif self.y[i] != self.y[j] and random.binomial(1, q_het):
                     self.edge_sources.append(i)
                     self.edge_targets.append(j)
-                    self.node_degrees[j] += 1
-                    self.max_degree = max(self.max_degree, self.node_degrees[j])
+                    # self.node_degrees[j] += 1
+                    # self.max_degree = max(self.max_degree, self.node_degrees[j])
