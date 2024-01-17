@@ -3,8 +3,8 @@ from csbms import MultiClassCSBM
 
 class CSBMhom(MultiClassCSBM):
 
-    def __init__(self, n=5000, class_distribution=None, means=None, q_hom=0.05, q_het=0.1, sigma_square=0.1, classes=20,
-                 dimensions=100):
+    def __init__(self, n=5000, class_distribution=None, means=None, q_hom=0.05, q_het=0.01, sigma_square=0.1,
+                 classes=16, dimensions=128):
         super().__init__(n, class_distribution, means, q_hom, q_het, sigma_square, classes, dimensions)
 
     def evolve(self):
@@ -12,4 +12,4 @@ class CSBMhom(MultiClassCSBM):
         super().evolve()
 
     def update_q_hom(self):
-        self.q_hom = min(0.95, self.q_hom + 0.1)
+        self.q_hom = min(0.5, self.q_hom + 0.1)

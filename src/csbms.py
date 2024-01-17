@@ -1,5 +1,3 @@
-from collections import defaultdict
-
 import numpy as np
 import torch
 from numpy import random
@@ -7,8 +5,8 @@ from torch_geometric.data import Data
 
 
 class MultiClassCSBM:
-    def __init__(self, n=5000, class_distribution=None, means=None, q_hom=0.5, q_het=0.1, sigma_square=0.1, classes=20,
-                 dimensions=100):
+    def __init__(self, n=5000, class_distribution=None, means=None, q_hom=0.05, q_het=0.01, sigma_square=0.1,
+                 classes=16, dimensions=128):
         self.n = n
         self.sigma_square = sigma_square
         self.classes = classes
@@ -109,7 +107,6 @@ class StructureCSBM(MultiClassCSBM):
 
     def __init__(self, n=5000, class_distribution=None, means=None, q_hom=0.05, q_het=0.01, sigma_square=0.1,
                  classes=16, dimensions=128):
-        self.node_degrees = defaultdict(int)
         self.max_degree = 1
         super().__init__(n,
                          class_distribution,
@@ -127,19 +124,12 @@ class StructureCSBM(MultiClassCSBM):
             for j in range(end):
                 if i == j:
                     continue
-                # deg = self.node_degrees[j]
-                # q_hom = max(self.q_hom, 0.5 * deg / self.max_degree)
-                # q_het = max(self.q_het, 0.1 * deg / self.max_degree)
                 tau = j // self.n + 1
-                q_hom = 0.5 / tau
-                q_het = 0.1 / tau
+                q_hom = min(0.5, self.q_hom * tau)
+                q_het = min(0.1, self.q_het * tau)
                 if self.y[i] == self.y[j] and random.binomial(1, q_hom):
                     self.edge_sources.append(i)
                     self.edge_targets.append(j)
-                    # self.node_degrees[j] += 1
-                    # self.max_degree = max(self.max_degree, self.node_degrees[j])
                 elif self.y[i] != self.y[j] and random.binomial(1, q_het):
                     self.edge_sources.append(i)
                     self.edge_targets.append(j)
-                    # self.node_degrees[j] += 1
-                    # self.max_degree = max(self.max_degree, self.node_degrees[j])
