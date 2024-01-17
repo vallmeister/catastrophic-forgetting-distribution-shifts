@@ -1,5 +1,7 @@
 import numpy as np
 import torch
+
+from metrics import mmd_max_rbf
 from numpy import random
 from torch_geometric.data import Data
 
@@ -101,6 +103,20 @@ class MultiClassCSBM:
         self.data.train_mask[:int(train * num_nodes)] = 1
         self.data.test_mask = torch.zeros(num_nodes, dtype=torch.bool)
         self.data.test_mask[int(test * num_nodes):] = 1
+
+    def get_feature_shift_rbf_mmd(self):
+        mmd = 0
+        n = self.n
+        X = self.X[:n]
+        y_0 = self.y[:n]
+        Z = self.X[-n:]
+        y_1 = self.y[-n:]
+        for c in range(self.classes):
+            mmd += mmd_max_rbf(X[y_0 == c], Z[y_1 == c], self.dimensions)
+        return mmd
+
+    def get_structure_shift_rbf_mmd(self):
+        pass
 
 
 class StructureCSBM(MultiClassCSBM):
