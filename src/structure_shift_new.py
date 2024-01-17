@@ -23,7 +23,7 @@ import sys
 from csbms import MultiClassCSBM, StructureCSBM
 from CSBMhet import CSBMhet
 from CSBMhom import CSBMhom
-from metrics import mmd_linear
+from metrics import mmd_linear, mmd_max_rbf
 
 import torch
 from torch_geometric.nn import Node2Vec
@@ -32,12 +32,8 @@ from torch_geometric.nn import Node2Vec
 # In[2]:
 
 
-d = 128
 n = 5000
-c = 16
-training_time = 100
-q1 = 0.05
-q2 = 0.01
+training_time = 25
 T = 10
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -47,10 +43,10 @@ print(device)
 # In[3]:
 
 
-csbm_constant = MultiClassCSBM(n=n, dimensions=d, classes=c, q_hom=q1, q_het=q2)
-csbm_hom = CSBMhom(n=n, dimensions=d, classes=c, q_het=q2)
-csbm_het = CSBMhet(n=n, dimensions=d, classes=c, q_hom=q1)
-csbm_struct = StructureCSBM(n=n, dimensions=d, classes=c)
+csbm_constant = MultiClassCSBM(n=n)
+csbm_hom = CSBMhom(n=n)
+csbm_het = CSBMhet(n=n)
+csbm_struct = StructureCSBM(n=n)
 csbms = [csbm_constant, csbm_hom, csbm_het, csbm_struct]
 
 
@@ -71,12 +67,12 @@ def get_node_embeddings(csbm):
     model = Node2Vec(
     data.edge_index,
     embedding_dim=128,
-    walk_length=20,
+    walk_length=250,
     context_size=10,
     walks_per_node=10,
     num_negative_samples=1,
     p=1.0,
-    q=1.0).to(device)
+    q=2.0).to(device)
     
     num_workers = 4 if sys.platform == 'linux' else 0
     loader = model.loader(batch_size=128, shuffle=True, num_workers=num_workers)
@@ -128,7 +124,7 @@ emb_const, emb_hom, emb_het, emb_struct = embeddings
 # In[7]:
 
 
-def get_mmds(embedding):
+def get_linear_mmd(embedding):
     differences = []
     for t in range(T):
         start = t * n
@@ -140,61 +136,99 @@ def get_mmds(embedding):
 # In[8]:
 
 
-mmds_const = get_mmds(emb_const)
-mmds_hom = get_mmds(emb_hom)
-mmds_het = get_mmds(emb_het)
-mmds_struct = get_mmds(emb_struct)
+def get_rbf_mmd(embedding):
+    differences = []
+    for t in range(T):
+        start = t * n
+        end = start + n
+        differences.append(mmd_max_rbf(embedding[:n], embedding[start:end]))
+    return differences
 
 
 # In[9]:
 
 
+mmds_linear_const = get_linear_mmd(emb_const)
+mmds_linear_hom = get_linear_mmd(emb_hom)
+mmds_linear_het = get_linear_mmd(emb_het)
+mmds_linear_struct = get_linear_mmd(emb_struct)
+
+mmds_rbf_const = get_rbf_mmd(emb_const)
+mmds_rbf_hom = get_rbf_mmd(emb_hom)
+mmds_rbf_het = get_rbf_mmd(emb_het)
+mmds_rbf_struct = get_rbf_mmd(emb_struct)
+
+
+# In[10]:
+
+
 # plot
 plt.figure(figsize=(12, 6))
 
-plt.plot(time_steps, mmds_const, marker='o', linestyle='-', color='black', label='CSBM-Const')
-plt.plot(time_steps, mmds_hom, marker='o', linestyle='-', color='r', label='CSBM-Hom')
-plt.plot(time_steps, mmds_het, marker='o', linestyle='-', color='orange', label='CSBM-Het')
-plt.plot(time_steps, mmds_struct, marker='o', linestyle='-', color='blue', label='CSBM-Struct')
+plt.plot(time_steps, mmds_linear_const, marker='o', linestyle='-', color='black', label='CSBM-Const')
+plt.plot(time_steps, mmds_linear_hom, marker='o', linestyle='-', color='r', label='CSBM-Hom')
+plt.plot(time_steps, mmds_linear_het, marker='o', linestyle='-', color='orange', label='CSBM-Het')
+plt.plot(time_steps, mmds_linear_struct, marker='o', linestyle='-', color='blue', label='CSBM-Struct')
 
 plt.title(r'Graph structure-shift for different CSBMs')
 plt.xlabel('Time Steps')
 plt.ylabel(r'$MMD^{2}$ with linear kernel')
 plt.grid(True)
 plt.legend(loc='lower right')
-plt.savefig('structure_shift_all.pdf', format='pdf')
+plt.savefig('structure_shift_linear.pdf', format='pdf')
 #plt.show()
 plt.close()
 
 
-# In[10]:
+# In[11]:
 
 
-fig, axes = plt.subplots(nrows=4, ncols=1, figsize=(12, 20))
+# plot
+plt.figure(figsize=(12, 6))
+
+plt.plot(time_steps, mmds_rbf_const, marker='o', linestyle='-', color='black', label='CSBM-Const')
+plt.plot(time_steps, mmds_rbf_hom, marker='o', linestyle='-', color='r', label='CSBM-Hom')
+plt.plot(time_steps, mmds_rbf_het, marker='o', linestyle='-', color='orange', label='CSBM-Het')
+plt.plot(time_steps, mmds_rbf_struct, marker='o', linestyle='-', color='blue', label='CSBM-Struct')
+
+plt.title(r'Graph structure-shift for different CSBMs')
+plt.xlabel('Time Steps')
+plt.ylabel(r'$MMD^{2}$ with RBF-kernel')
+plt.grid(True)
+plt.legend(loc='lower right')
+plt.savefig('structure_shift_rbf.pdf', format='pdf')
+#plt.show()
+plt.close()
+
+
+# In[12]:
+
+
+fig, axes = plt.subplots(nrows=1, ncols=4, figsize=(20, 6))
 fig.suptitle(r'Graph structure-shift for different CSBMs')
 
-coefficiencts = np.polyfit(time_steps, mmds_const, 1)
+coefficiencts = np.polyfit(time_steps, mmds_linear_const, 1)
 poly = np.poly1d(coefficiencts)
 y_fit = poly(time_steps)
-axes[0].plot(time_steps, mmds_const, marker='o', linestyle='-', color='black', label='CSBM-Const')
+axes[0].plot(time_steps, mmds_linear_const, marker='o', linestyle='-', color='black', label='CSBM-Const')
 axes[0].plot(time_steps, y_fit, marker='o', linestyle='-', color='gray')
 
-coefficiencts = np.polyfit(time_steps, mmds_hom, 1)
+coefficiencts = np.polyfit(time_steps, mmds_linear_hom, 1)
 poly = np.poly1d(coefficiencts)
 y_fit = poly(time_steps)
-axes[1].plot(time_steps, mmds_hom, marker='o', linestyle='-', color='red', label='CSBM-Hom')
+axes[1].plot(time_steps, mmds_linear_hom, marker='o', linestyle='-', color='red', label='CSBM-Hom')
 axes[1].plot(time_steps, y_fit, marker='o', linestyle='-', color='gray')
 
-coefficiencts = np.polyfit(time_steps, mmds_het, 1)
+coefficiencts = np.polyfit(time_steps, mmds_linear_het, 1)
 poly = np.poly1d(coefficiencts)
 y_fit = poly(time_steps)
-axes[2].plot(time_steps, mmds_het, marker='o', linestyle='-', color='orange', label='CSBM-Het')
+axes[2].plot(time_steps, mmds_linear_het, marker='o', linestyle='-', color='orange', label='CSBM-Het')
 axes[2].plot(time_steps, y_fit, marker='o', linestyle='-', color='gray')
 
-coefficiencts = np.polyfit(time_steps, mmds_struct, 1)
+coefficiencts = np.polyfit(time_steps, mmds_linear_struct, 1)
 poly = np.poly1d(coefficiencts)
 y_fit = poly(time_steps)
-axes[3].plot(time_steps, mmds_struct, marker='o', linestyle='-', color='b', label='CSBM-Struct')
+axes[3].plot(time_steps, mmds_linear_struct, marker='o', linestyle='-', color='b', label='CSBM-Struct')
 axes[3].plot(time_steps, y_fit, marker='o', linestyle='-', color='gray')
 
 for ax in axes:
@@ -202,7 +236,7 @@ for ax in axes:
     ax.set_ylabel('MMD with linear kernel')
     ax.legend(loc='upper left')
     ax.grid(True)
-plt.savefig('structure_shift_separate.pdf', format='pdf')
+plt.savefig('structure_shift_separate_linear.pdf', format='pdf')
 #plt.show()
 plt.close()
 

@@ -141,8 +141,8 @@ class StructureCSBM(MultiClassCSBM):
                 if i == j:
                     continue
                 tau = j // self.n + 1
-                q_hom = min(0.5, self.q_hom * tau)
-                q_het = min(0.1, self.q_het * tau)
+                q_hom = 0.5 / tau
+                q_het = 0.1 / tau
                 if self.y[i] == self.y[j] and random.binomial(1, q_hom):
                     self.edge_sources.append(i)
                     self.edge_targets.append(j)

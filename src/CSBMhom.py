@@ -12,4 +12,4 @@ class CSBMhom(MultiClassCSBM):
         super().evolve()
 
     def update_q_hom(self):
-        self.q_hom = min(0.5, self.q_hom + 0.1)
+        self.q_hom = min(0.5, self.q_hom + 0.05)
