@@ -7,7 +7,7 @@ from torch_geometric.data import Data
 
 
 class MultiClassCSBM:
-    def __init__(self, n=5000, class_distribution=None, means=None, q_hom=0.05, q_het=0.01, sigma_square=0.1,
+    def __init__(self, n=5000, class_distribution=None, means=None, q_hom=0.005, q_het=0.001, sigma_square=0.1,
                  classes=16, dimensions=128):
         self.n = n
         self.sigma_square = sigma_square
@@ -24,7 +24,7 @@ class MultiClassCSBM:
         self.draw_class_labels()
 
         if means:
-            if len(means) == classes and all(np.dot(m1, m2).round(10) == 0.0 for m1, m2 in means if m1 != m2):
+            if len(means) == classes and all(np.dot(m1, m2).round(6) == 0.0 for m1, m2 in means if m1 != m2):
                 self.means = means
             else:
                 # TODO: Gram-Schmitt?
@@ -41,9 +41,7 @@ class MultiClassCSBM:
         self.generate_edges()
 
         self.data = None
-        self.tau = 1
         self.build_graph()
-        self.set_masks()
 
     def initialize_means(self):
         self.means = np.zeros((self.classes, self.dimensions))
@@ -60,9 +58,9 @@ class MultiClassCSBM:
         new_labels = random.choice(list(range(self.classes)), self.n, p=self.p)
         self.y = np.concatenate((self.y, new_labels))
 
-    def draw_node_features(self, t=0):
+    def draw_node_features(self):
         cov = self.sigma_square * np.eye(self.dimensions)
-        offset = t * self.n
+        offset = len(self.X)
         node_features = np.zeros((self.n, self.dimensions))
         for i in range(offset, offset + self.n):
             class_label = self.y[i]
@@ -70,16 +68,20 @@ class MultiClassCSBM:
             node_features[i - offset] = random.multivariate_normal(class_mean, cov, 1)
         self.X = np.concatenate((self.X, node_features))
 
-    def generate_edges(self, t=0):
-        offset = self.n * t
-        for i in range(offset, offset + self.n):
-            for j in range((t + 1) * self.n):
+    def generate_edges(self):
+        end = len(self.X)
+        start = end - self.n
+        t = end // self.n
+        q_hom = self.q_hom / t
+        q_het = self.q_het / t
+        for i in range(start, end):
+            for j in range(end):
                 if i == j:
                     continue
-                elif self.y[i] == self.y[j] and random.binomial(1, self.q_hom):
+                elif self.y[i] == self.y[j] and random.binomial(1, q_hom):
                     self.edge_sources.append(i)
                     self.edge_targets.append(j)
-                elif self.y[i] != self.y[j] and random.binomial(1, self.q_het):
+                elif self.y[i] != self.y[j] and random.binomial(1, q_het):
                     self.edge_sources.append(i)
                     self.edge_targets.append(j)
 
@@ -87,22 +89,31 @@ class MultiClassCSBM:
         edge_index = torch.tensor([self.edge_sources, self.edge_targets], dtype=torch.long)
         x = torch.tensor(self.X, dtype=torch.float)
         y = torch.tensor(self.y, dtype=torch.long)
-        self.data = Data(x=x, edge_index=edge_index, y=y)
+        train_mask, validation_mask, test_mask = self.get_masks(len(self.X) // self.n)
+        self.data = Data(x=x, edge_index=edge_index, y=y, train_mask=train_mask, validation_mask=validation_mask,
+                         test_mask=test_mask)
 
     def evolve(self):
         self.draw_class_labels()
-        self.draw_node_features(self.tau)
-        self.generate_edges(self.tau)
-        self.tau += 1
+        self.draw_node_features()
+        self.generate_edges()
         self.build_graph()
-        self.set_masks()
 
-    def set_masks(self, train=0.8, validation=0.1, test=0.1):
-        num_nodes = self.n * self.tau
-        self.data.train_mask = torch.zeros(num_nodes, dtype=torch.bool)
-        self.data.train_mask[:int(train * num_nodes)] = 1
-        self.data.test_mask = torch.zeros(num_nodes, dtype=torch.bool)
-        self.data.test_mask[int(test * num_nodes):] = 1
+    def get_masks(self, cycles, train=0.8, validation=0.1, test=0.1):
+        n = self.n
+        train_mask = torch.zeros(n, dtype=torch.int)
+        train_mask[:int(train * n)] = 1
+        train_mask = train_mask.repeat(cycles)
+
+        validation_mask = torch.zeros(n, dtype=torch.int)
+        validation_mask[int(train * n):int((train + validation) * n)] = 1
+        validation_mask = validation_mask.repeat(cycles)
+
+        test_mask = torch.zeros(n, dtype=torch.int)
+        test_mask[-int(test * n):] = 1
+        test_mask = test_mask.repeat(cycles)
+
+        return train_mask, validation_mask, test_mask
 
     def get_feature_shift_rbf_mmd(self):
         mmd = 0
@@ -121,7 +132,7 @@ class MultiClassCSBM:
 
 class StructureCSBM(MultiClassCSBM):
 
-    def __init__(self, n=5000, class_distribution=None, means=None, q_hom=0.05, q_het=0.01, sigma_square=0.1,
+    def __init__(self, n=5000, class_distribution=None, means=None, q_hom=0.005, q_het=0.001, sigma_square=0.1,
                  classes=16, dimensions=128):
         self.max_degree = 1
         super().__init__(n,
@@ -133,16 +144,16 @@ class StructureCSBM(MultiClassCSBM):
                          classes,
                          dimensions)
 
-    def generate_edges(self, t=0):
-        start = self.n * t
-        end = start + self.n
+    def generate_edges(self):
+        end = len(self.X)
+        start = end - self.n
         for i in range(start, end):
             for j in range(end):
                 if i == j:
                     continue
-                tau = j // self.n + 1
-                q_hom = 0.5 / tau
-                q_het = 0.1 / tau
+                t = j // self.n + 1
+                q_hom = 0.05 / t
+                q_het = 0.01 / t
                 if self.y[i] == self.y[j] and random.binomial(1, q_hom):
                     self.edge_sources.append(i)
                     self.edge_targets.append(j)

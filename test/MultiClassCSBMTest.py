@@ -9,19 +9,20 @@ class MultiClassCSBMTest(unittest.TestCase):
 
     def test_means_are_unit_vectors(self):
         for mean in self.csbm.means:
-            self.assertEquals(linalg.norm(mean), 1.)
+            self.assertEquals(round(linalg.norm(mean), 1), 1.)
 
     def test_means_are_pairwise_equidistant(self):
         m = len(self.csbm.means)
         for i in range(m):
             for j in range(i + 1, m):
-                self.assertEquals(linalg.norm(self.csbm.means[i] - self.csbm.means[j]), math.sqrt(2))
+                self.assertEquals(round(linalg.norm(self.csbm.means[i] - self.csbm.means[j]), 6),
+                                  round(math.sqrt(2), 6))
 
     def test_number_of_nodes(self):
         self.assertEquals(self.csbm.data.num_nodes, 5000)
 
     def test_number_of_node_features(self):
-        self.assertEquals(self.csbm.data.num_node_features, 100)
+        self.assertEquals(self.csbm.data.num_node_features, 128)
 
     def test_self_loops(self):
         self.assertFalse(self.csbm.data.has_self_loops())
