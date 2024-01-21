@@ -32,7 +32,7 @@ from torch_geometric.nn import Node2Vec
 # In[2]:
 
 
-n = 5000
+n = 10000
 training_time = 100
 T = 10
 
@@ -67,7 +67,7 @@ def get_node_embeddings(csbm):
     data = csbm.data
     model = Node2Vec(
     data.edge_index,
-    embedding_dim=128,
+    embedding_dim=32,
     walk_length=20,
     context_size=10,
     walks_per_node=10,
@@ -113,7 +113,7 @@ def get_node_embeddings(csbm):
     return model.embedding.weight.cpu().detach().numpy()
 
 
-# In[ ]:
+# In[6]:
 
 
 embeddings = []
@@ -123,7 +123,7 @@ emb_const, emb_hom, emb_het, emb_struct = embeddings
 emb_zero = get_node_embeddings(csbm_zero)
 
 
-# In[ ]:
+# In[7]:
 
 
 def get_linear_mmd(embedding):
@@ -135,7 +135,7 @@ def get_linear_mmd(embedding):
     return differences
 
 
-# In[ ]:
+# In[8]:
 
 
 def get_rbf_mmd(embedding):
@@ -147,7 +147,7 @@ def get_rbf_mmd(embedding):
     return differences
 
 
-# In[ ]:
+# In[9]:
 
 
 mmds_linear_const = get_linear_mmd(emb_const)
@@ -163,7 +163,7 @@ mmds_rbf_struct = get_rbf_mmd(emb_struct)
 mmds_rbf_zero = get_rbf_mmd(emb_zero)
 
 
-# In[ ]:
+# In[10]:
 
 
 # plot
@@ -185,7 +185,7 @@ plt.savefig('structure_shift_linear.pdf', format='pdf')
 plt.close()
 
 
-# In[ ]:
+# In[11]:
 
 
 # plot
@@ -207,7 +207,7 @@ plt.savefig('structure_shift_rbf.pdf', format='pdf')
 plt.close()
 
 
-# In[ ]:
+# In[12]:
 
 
 fig, axes = plt.subplots(nrows=1, ncols=4, figsize=(20, 6))
@@ -247,10 +247,28 @@ plt.savefig('structure_shift_separate_linear.pdf', format='pdf')
 plt.close()
 
 
-# In[ ]:
+# In[13]:
 
 
 for csbm in csbms:
     print(f'|V|= {csbm.data.num_nodes}, |E|= {csbm.data.num_edges}, |E|/|V| = {(csbm.data.num_edges / csbm.data.num_nodes):.1f}')
     print(f'Possible edges: {(100 * csbm.data.num_edges / csbm.data.num_nodes ** 2):.2f}%')
+
+
+# In[14]:
+
+
+train, validation, test = 0.8, 0.1, 0.1
+n = 10
+N = 20
+train_mask = torch.zeros(N, dtype=torch.int)
+train_mask[-n:-int(n * (validation + test))] = 1
+
+validation_mask = torch.zeros(N, dtype=torch.int)
+validation_mask[-int((validation + test) * n):-int(n * test)] = 1
+
+test_mask = torch.zeros(n, dtype=torch.int)
+test_mask[-int(test * n):] = 1
+
+print(train_mask, validation_mask, test_mask)
 

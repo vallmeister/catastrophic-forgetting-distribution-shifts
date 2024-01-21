@@ -89,7 +89,7 @@ class MultiClassCSBM:
         edge_index = torch.tensor([self.edge_sources, self.edge_targets], dtype=torch.long)
         x = torch.tensor(self.X, dtype=torch.float)
         y = torch.tensor(self.y, dtype=torch.long)
-        train_mask, validation_mask, test_mask = self.get_masks(len(self.X) // self.n)
+        train_mask, validation_mask, test_mask = self.get_masks()
         self.data = Data(x=x, edge_index=edge_index, y=y, train_mask=train_mask, validation_mask=validation_mask,
                          test_mask=test_mask)
 
@@ -99,19 +99,17 @@ class MultiClassCSBM:
         self.generate_edges()
         self.build_graph()
 
-    def get_masks(self, cycles, train=0.8, validation=0.1, test=0.1):
+    def get_masks(self, train=0.1, validation=0.1, test=0.8):
         n = self.n
-        train_mask = torch.zeros(n, dtype=torch.int)
-        train_mask[:int(train * n)] = 1
-        train_mask = train_mask.repeat(cycles)
+        N = len(self.X)
+        train_mask = torch.zeros(N, dtype=torch.bool)
+        train_mask[-n:-int(n * (validation + test))] = 1
 
-        validation_mask = torch.zeros(n, dtype=torch.int)
-        validation_mask[int(train * n):int((train + validation) * n)] = 1
-        validation_mask = validation_mask.repeat(cycles)
+        validation_mask = torch.zeros(N, dtype=torch.bool)
+        validation_mask[-int((validation + test) * n):-int(n * test)] = 1
 
-        test_mask = torch.zeros(n, dtype=torch.int)
+        test_mask = torch.zeros(N, dtype=torch.bool)
         test_mask[-int(test * n):] = 1
-        test_mask = test_mask.repeat(cycles)
 
         return train_mask, validation_mask, test_mask
 
