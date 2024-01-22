@@ -32,8 +32,8 @@ from torch_geometric.nn import Node2Vec
 # In[2]:
 
 
-n = 10000
-training_time = 100
+n = 5000
+training_time = 150
 T = 10
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -45,32 +45,39 @@ print(device)
 
 csbm_zero = MultiClassCSBM(n =10*n)
 csbm_constant = MultiClassCSBM(n=n)
-csbm_hom = CSBMhom(n=n)
+#csbm_hom = CSBMhom(n=n)
 csbm_het = CSBMhet(n=n)
 csbm_struct = StructureCSBM(n=n)
-csbms = [csbm_constant, csbm_hom, csbm_het, csbm_struct]
+csbms = [csbm_constant, csbm_het, csbm_struct]
+#csbms.append(csbm_hom)
+names = {csbm_zero: 'CSBM-Zero',
+         csbm_constant: 'CSBM-Const',
+         csbm_het: 'CSBM-Het',
+         csbm_struct: 'CSBM-Struct'}
 
 
 # In[4]:
 
 
 time_steps = list(range(T))
-for _ in range(T - 1):
+for t in range(1, T + 1):
     for csbm in csbms:
-        csbm.evolve()
+        if t > 1:
+            csbm.evolve()
+        print(f'{names[csbm]}'.ljust(12) + f'|t={t:02d}|'.ljust(5) + f'{len(csbm.data.edge_index[0])} edges'.rjust(20))
 
 
-# In[5]:
+# In[7]:
 
 
 def get_node_embeddings(csbm):
     data = csbm.data
     model = Node2Vec(
     data.edge_index,
-    embedding_dim=32,
-    walk_length=20,
-    context_size=10,
-    walks_per_node=10,
+    embedding_dim=128,
+    walk_length=150,
+    context_size=75,
+    walks_per_node=20,
     num_negative_samples=1,
     p=1.0,
     q=1.0).to(device)
@@ -78,6 +85,14 @@ def get_node_embeddings(csbm):
     num_workers = 4 if sys.platform == 'linux' else 0
     loader = model.loader(batch_size=32, shuffle=True, num_workers=num_workers)
     optimizer = torch.optim.Adam(list(model.parameters()), lr=0.01)
+
+    N = len(csbm.X)
+    train_mask = torch.zeros(n, dtype=torch.bool)
+    train_mask[:int(0.8 * n)] = 1
+    train_mask = train_mask.repeat(N // n)
+    test_mask = torch.zeros(n, dtype=torch.bool)
+    test_mask[-int(0.1 * n):] = 1
+    test_mask = test_mask.repeat(N // n)
     
     def train():
         model.train()
@@ -95,10 +110,10 @@ def get_node_embeddings(csbm):
         model.eval()
         z = model()
         acc = model.test(
-            train_z=z[data.train_mask],
-            train_y=data.y[data.train_mask],
-            test_z=z[data.test_mask],
-            test_y=data.y[data.test_mask],
+            train_z=z[train_mask],
+            train_y=data.y[train_mask],
+            test_z=z[test_mask],
+            test_y=data.y[test_mask],
             max_iter=150,
         )
         return acc
@@ -109,21 +124,24 @@ def get_node_embeddings(csbm):
         max_loss = max(max_loss, loss)
         acc = test()
         max_acc = max(acc, max_acc)
-    print(f'Loss: {max_loss:.4f}, Acc: {max_acc:.4f}')
+    print('-' * 10 + names[csbm] + '-' * 10)
+    print(f'Loss: {max_loss:.3f}, Acc: {max_acc:.4f}')
+    print(f'train_mask[0]: {train_mask[0]}, [0.5n]: {train_mask[int(0.5 * n)]}, [0.9n]: {train_mask[int(0.9 * n)]}, [n-1]: {train_mask[n-1]}')
+    print(f'test_mask[0]: {test_mask[0]}, [0.5n]: {test_mask[int(0.5 * n)]}, [0.9n]: {test_mask[int(0.9 * n)]}, [n-1]: {test_mask[n - 1]}\n')
     return model.embedding.weight.cpu().detach().numpy()
 
 
-# In[6]:
+# In[8]:
 
 
 embeddings = []
 for csbm in csbms:
     embeddings.append(get_node_embeddings(csbm))
-emb_const, emb_hom, emb_het, emb_struct = embeddings
+emb_const, emb_het, emb_struct = embeddings
 emb_zero = get_node_embeddings(csbm_zero)
 
 
-# In[7]:
+# In[9]:
 
 
 def get_linear_mmd(embedding):
@@ -135,7 +153,7 @@ def get_linear_mmd(embedding):
     return differences
 
 
-# In[8]:
+# In[10]:
 
 
 def get_rbf_mmd(embedding):
@@ -147,23 +165,23 @@ def get_rbf_mmd(embedding):
     return differences
 
 
-# In[9]:
+# In[11]:
 
 
 mmds_linear_const = get_linear_mmd(emb_const)
-mmds_linear_hom = get_linear_mmd(emb_hom)
+#mmds_linear_hom = get_linear_mmd(emb_hom)
 mmds_linear_het = get_linear_mmd(emb_het)
 mmds_linear_struct = get_linear_mmd(emb_struct)
 mmds_linear_zero = get_linear_mmd(emb_zero)
 
 mmds_rbf_const = get_rbf_mmd(emb_const)
-mmds_rbf_hom = get_rbf_mmd(emb_hom)
+#mmds_rbf_hom = get_rbf_mmd(emb_hom)
 mmds_rbf_het = get_rbf_mmd(emb_het)
 mmds_rbf_struct = get_rbf_mmd(emb_struct)
 mmds_rbf_zero = get_rbf_mmd(emb_zero)
 
 
-# In[10]:
+# In[12]:
 
 
 # plot
@@ -171,7 +189,7 @@ plt.figure(figsize=(12, 6))
 
 plt.plot(time_steps, mmds_linear_const, marker='o', linestyle='-', color='black', label='CSBM-Const')
 plt.plot(time_steps, mmds_linear_zero, marker='o', linestyle='-', color='gray', label='CSBM-Zero')
-plt.plot(time_steps, mmds_linear_hom, marker='o', linestyle='-', color='r', label='CSBM-Hom')
+#plt.plot(time_steps, mmds_linear_hom, marker='o', linestyle='-', color='r', label='CSBM-Hom')
 plt.plot(time_steps, mmds_linear_het, marker='o', linestyle='-', color='orange', label='CSBM-Het')
 plt.plot(time_steps, mmds_linear_struct, marker='o', linestyle='-', color='blue', label='CSBM-Struct')
 
@@ -185,7 +203,7 @@ plt.savefig('structure_shift_linear.pdf', format='pdf')
 plt.close()
 
 
-# In[11]:
+# In[13]:
 
 
 # plot
@@ -193,7 +211,7 @@ plt.figure(figsize=(12, 6))
 
 plt.plot(time_steps, mmds_rbf_const, marker='o', linestyle='-', color='black', label='CSBM-Const')
 plt.plot(time_steps, mmds_rbf_zero, marker='o', linestyle='-', color='gray', label='CSBM-Zero')
-plt.plot(time_steps, mmds_rbf_hom, marker='o', linestyle='-', color='r', label='CSBM-Hom')
+#plt.plot(time_steps, mmds_rbf_hom, marker='o', linestyle='-', color='r', label='CSBM-Hom')
 plt.plot(time_steps, mmds_rbf_het, marker='o', linestyle='-', color='orange', label='CSBM-Het')
 plt.plot(time_steps, mmds_rbf_struct, marker='o', linestyle='-', color='blue', label='CSBM-Struct')
 
@@ -207,68 +225,12 @@ plt.savefig('structure_shift_rbf.pdf', format='pdf')
 plt.close()
 
 
-# In[12]:
-
-
-fig, axes = plt.subplots(nrows=1, ncols=4, figsize=(20, 6))
-fig.suptitle(r'Graph structure-shift for different CSBMs')
-
-coefficiencts = np.polyfit(time_steps, mmds_linear_const, 1)
-poly = np.poly1d(coefficiencts)
-y_fit = poly(time_steps)
-axes[0].plot(time_steps, mmds_linear_const, marker='o', linestyle='-', color='black', label='CSBM-Const')
-axes[0].plot(time_steps, y_fit, marker='o', linestyle='-', color='gray')
-
-coefficiencts = np.polyfit(time_steps, mmds_linear_hom, 1)
-poly = np.poly1d(coefficiencts)
-y_fit = poly(time_steps)
-axes[1].plot(time_steps, mmds_linear_hom, marker='o', linestyle='-', color='red', label='CSBM-Hom')
-axes[1].plot(time_steps, y_fit, marker='o', linestyle='-', color='gray')
-
-coefficiencts = np.polyfit(time_steps, mmds_linear_het, 1)
-poly = np.poly1d(coefficiencts)
-y_fit = poly(time_steps)
-axes[2].plot(time_steps, mmds_linear_het, marker='o', linestyle='-', color='orange', label='CSBM-Het')
-axes[2].plot(time_steps, y_fit, marker='o', linestyle='-', color='gray')
-
-coefficiencts = np.polyfit(time_steps, mmds_linear_struct, 1)
-poly = np.poly1d(coefficiencts)
-y_fit = poly(time_steps)
-axes[3].plot(time_steps, mmds_linear_struct, marker='o', linestyle='-', color='b', label='CSBM-Struct')
-axes[3].plot(time_steps, y_fit, marker='o', linestyle='-', color='gray')
-
-for ax in axes:
-    ax.set_xlabel('Time steps')
-    ax.set_ylabel('MMD with linear kernel')
-    ax.legend(loc='upper left')
-    ax.grid(True)
-plt.savefig('structure_shift_separate_linear.pdf', format='pdf')
-#plt.show()
-plt.close()
-
-
-# In[13]:
-
-
-for csbm in csbms:
-    print(f'|V|= {csbm.data.num_nodes}, |E|= {csbm.data.num_edges}, |E|/|V| = {(csbm.data.num_edges / csbm.data.num_nodes):.1f}')
-    print(f'Possible edges: {(100 * csbm.data.num_edges / csbm.data.num_nodes ** 2):.2f}%')
-
-
 # In[14]:
 
 
-train, validation, test = 0.8, 0.1, 0.1
-n = 10
-N = 20
-train_mask = torch.zeros(N, dtype=torch.int)
-train_mask[-n:-int(n * (validation + test))] = 1
-
-validation_mask = torch.zeros(N, dtype=torch.int)
-validation_mask[-int((validation + test) * n):-int(n * test)] = 1
-
-test_mask = torch.zeros(n, dtype=torch.int)
-test_mask[-int(test * n):] = 1
-
-print(train_mask, validation_mask, test_mask)
+csbms.append(csbm_zero)
+for csbm in csbms:
+    print('-' * 10 + names[csbm] + '-' * 10)
+    print(f'|V|= {csbm.data.num_nodes}, |E|= {csbm.data.num_edges}, |E|/|V| = {(csbm.data.num_edges / csbm.data.num_nodes):.1f}')
+    print(f'Possible edges: {(100 * csbm.data.num_edges / csbm.data.num_nodes ** 2):.2f}%\n')
 

@@ -90,7 +90,7 @@ class MultiClassCSBM:
         x = torch.tensor(self.X, dtype=torch.float)
         y = torch.tensor(self.y, dtype=torch.long)
         train_mask, validation_mask, test_mask = self.get_masks()
-        self.data = Data(x=x, edge_index=edge_index, y=y, train_mask=train_mask, validation_mask=validation_mask,
+        self.data = Data(x=x, edge_index=edge_index, y=y, train_mask=train_mask, val_mask=validation_mask,
                          test_mask=test_mask)
 
     def evolve(self):
@@ -99,19 +99,19 @@ class MultiClassCSBM:
         self.generate_edges()
         self.build_graph()
 
-    def get_masks(self, train=0.1, validation=0.1, test=0.8):
+    def get_masks(self, train=0.1, val=0.1, test=0.8):
         n = self.n
         N = len(self.X)
         train_mask = torch.zeros(N, dtype=torch.bool)
-        train_mask[-n:-int(n * (validation + test))] = 1
+        train_mask[-n:-int(n * (val + test))] = 1
 
-        validation_mask = torch.zeros(N, dtype=torch.bool)
-        validation_mask[-int((validation + test) * n):-int(n * test)] = 1
+        val_mask = torch.zeros(N, dtype=torch.bool)
+        val_mask[-int((val + test) * n):-int(n * test)] = 1
 
         test_mask = torch.zeros(N, dtype=torch.bool)
         test_mask[-int(test * n):] = 1
 
-        return train_mask, validation_mask, test_mask
+        return train_mask, val_mask, test_mask
 
     def get_feature_shift_rbf_mmd(self):
         mmd = 0
@@ -128,9 +128,30 @@ class MultiClassCSBM:
         pass
 
 
+class FeatureCSBM(MultiClassCSBM):
+    def __init__(self, n=5000, class_distribution=None, means=None, q_hom=0.005, q_het=0.001, sigma_square=0.1,
+                 classes=16, dimensions=128):
+        super().__init__(n, class_distribution, means, q_hom, q_het, sigma_square, classes, dimensions)
+        self.initial_means = self.means
+
+    def evolve(self):
+        self.update_means()
+        super().evolve()
+
+    def update_means(self):
+        new_means = np.zeros((self.classes, self.dimensions))
+        for i in range(self.classes):
+            curr_mean = self.means[i]
+            initial_mean, next_initial_mean = self.initial_means[i], self.initial_means[(i + 1) % self.classes]
+            new_mean = curr_mean + 0.1 * (next_initial_mean - initial_mean)
+            new_mean /= np.linalg.norm(new_mean)
+            new_means[i] = new_mean
+        self.means = new_means
+
+
 class StructureCSBM(MultiClassCSBM):
 
-    def __init__(self, n=5000, class_distribution=None, means=None, q_hom=0.005, q_het=0.001, sigma_square=0.1,
+    def __init__(self, n=5000, class_distribution=None, means=None, q_hom=0.05, q_het=0.01, sigma_square=0.1,
                  classes=16, dimensions=128):
         self.max_degree = 1
         super().__init__(n,
@@ -150,8 +171,8 @@ class StructureCSBM(MultiClassCSBM):
                 if i == j:
                     continue
                 t = j // self.n + 1
-                q_hom = 0.05 / t
-                q_het = 0.01 / t
+                q_hom = self.q_hom / t
+                q_het = self.q_het / t
                 if self.y[i] == self.y[j] and random.binomial(1, q_hom):
                     self.edge_sources.append(i)
                     self.edge_targets.append(j)

@@ -1,4 +1,5 @@
 from csbms import MultiClassCSBM
+from numpy import random
 
 
 class CSBMhet(MultiClassCSBM):
@@ -8,8 +9,20 @@ class CSBMhet(MultiClassCSBM):
         super().__init__(n, class_distribution, means, q_hom, q_het, sigma_square, classes, dimensions)
 
     def evolve(self):
-        self.update_q_het()
         super().evolve()
 
-    def update_q_het(self):
-        self.q_het = min(0.01, self.q_het + 0.001)
+    def generate_edges(self):
+        t = len(self.X) // self.n
+        q_het = min(self.q_het * t, 0.5)
+        end = len(self.X)
+        start = end - self.n
+        for i in range(start, end):
+            for j in range(end):
+                if i == j:
+                    continue
+                if self.y[i] == self.y[j] and random.binomial(1, self.q_hom):
+                    self.edge_sources.append(i)
+                    self.edge_targets.append(j)
+                elif self.y[i] != self.y[j] and random.binomial(1, q_het):
+                    self.edge_sources.append(i)
+                    self.edge_targets.append(j)
