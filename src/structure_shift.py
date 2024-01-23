@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import math
 import sys
-from csbms import MultiClassCSBM, StructureCSBM
+from csbm import MultiClassCSBM, StructureCSBM
 from CSBMhet import CSBMhet
 from CSBMhom import CSBMhom
 from metrics import mmd_linear
@@ -39,7 +39,7 @@ print(device)
 
 
 def train(model, loader, optimizer):
-    model.train()
+    model.train_split()
     total_loss = 0
     for pos_rw, neg_rw in loader:
         optimizer.zero_grad()
@@ -57,7 +57,7 @@ def train(model, loader, optimizer):
 def test(model, data):
     model.eval()
     z = model()
-    acc = model.test(
+    acc = model.test_split(
         train_z=z[data.train_mask],
         train_y=data.y[data.train_mask],
         test_z=z[data.test_mask],

@@ -1,7 +1,7 @@
 import math
 import unittest
 from numpy import linalg
-from src.csbms import MultiClassCSBM
+from src.csbm import MultiClassCSBM
 
 
 class MultiClassCSBMTest(unittest.TestCase):

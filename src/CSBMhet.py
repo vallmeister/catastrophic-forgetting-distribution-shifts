@@ -1,4 +1,4 @@
-from csbms import MultiClassCSBM
+from csbm import MultiClassCSBM
 from numpy import random
 
 

@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 
-from src.csbms import FeatureCSBM
+from src.csbm import FeatureCSBM
 
 
 class CSBMFeatTest(unittest.TestCase):

@@ -20,7 +20,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import sys
-from csbms import MultiClassCSBM, StructureCSBM
+from csbm import MultiClassCSBM, StructureCSBM
 from CSBMhet import CSBMhet
 from CSBMhom import CSBMhom
 from metrics import mmd_linear, mmd_max_rbf

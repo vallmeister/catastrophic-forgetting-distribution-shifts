@@ -8,7 +8,7 @@ from torch_geometric.data import Data
 
 class MultiClassCSBM:
     def __init__(self, n=5000, class_distribution=None, means=None, q_hom=0.005, q_het=0.001, sigma_square=0.1,
-                 classes=16, dimensions=128):
+                 classes=32, dimensions=128):
         self.n = n
         self.sigma_square = sigma_square
         self.classes = classes
@@ -16,6 +16,9 @@ class MultiClassCSBM:
 
         self.X = np.empty([0, dimensions])
         self.y = np.empty([0], dtype=np.int32)
+        self.train_split = 0.8
+        self.val_split = 0.1
+        self.test_split = 0.1
 
         if class_distribution and len(class_distribution) == classes:
             self.p = class_distribution
@@ -78,12 +81,15 @@ class MultiClassCSBM:
             for j in range(end):
                 if i == j:
                     continue
-                elif self.y[i] == self.y[j] and random.binomial(1, q_hom):
-                    self.edge_sources.append(i)
-                    self.edge_targets.append(j)
-                elif self.y[i] != self.y[j] and random.binomial(1, q_het):
-                    self.edge_sources.append(i)
-                    self.edge_targets.append(j)
+                self.set_edge(i, j, q_hom, q_het)
+
+    def set_edge(self, u, v, p, q):
+        if self.y[u] == self.y[v] and random.binomial(1, p):
+            self.edge_sources.append(u)
+            self.edge_targets.append(v)
+        elif self.y[u] != self.y[v] and random.binomial(1, q):
+            self.edge_sources.append(u)
+            self.edge_targets.append(v)
 
     def build_graph(self):
         edge_index = torch.tensor([self.edge_sources, self.edge_targets], dtype=torch.long)
@@ -99,7 +105,15 @@ class MultiClassCSBM:
         self.generate_edges()
         self.build_graph()
 
-    def get_masks(self, train=0.1, val=0.1, test=0.8):
+    def set_split(self, train, val, test):
+        if train + val + test != 1.0:
+            raise ValueError("Split has to sum up to 1")
+        elif not 0 <= train <= 1 or not 0 <= val <= 1 or not 0 <= test <= 1:
+            raise ValueError("Split-values have to be in range [0,1]")
+        self.train_split, self.val_split, self.test_split = train, val, test
+
+    def get_masks(self):
+        train, val, test = self.train_split, self.val_split, self.test_split
         n = self.n
         N = len(self.X)
         train_mask = torch.zeros(N, dtype=torch.bool)
@@ -113,7 +127,7 @@ class MultiClassCSBM:
 
         return train_mask, val_mask, test_mask
 
-    def get_feature_shift_rbf_mmd(self):
+    def get_per_class_feature_shift_mmd_with_rbf_kernel(self):
         mmd = 0
         n = self.n
         X = self.X[:n]
@@ -122,7 +136,7 @@ class MultiClassCSBM:
         y_1 = self.y[-n:]
         for c in range(self.classes):
             mmd += mmd_max_rbf(X[y_0 == c], Z[y_1 == c], self.dimensions)
-        return mmd
+        return mmd / self.classes
 
     def get_structure_shift_rbf_mmd(self):
         pass
@@ -130,7 +144,7 @@ class MultiClassCSBM:
 
 class FeatureCSBM(MultiClassCSBM):
     def __init__(self, n=5000, class_distribution=None, means=None, q_hom=0.005, q_het=0.001, sigma_square=0.1,
-                 classes=16, dimensions=128):
+                 classes=32, dimensions=128):
         super().__init__(n, class_distribution, means, q_hom, q_het, sigma_square, classes, dimensions)
         self.initial_means = self.means
 
@@ -152,7 +166,7 @@ class FeatureCSBM(MultiClassCSBM):
 class StructureCSBM(MultiClassCSBM):
 
     def __init__(self, n=5000, class_distribution=None, means=None, q_hom=0.05, q_het=0.01, sigma_square=0.1,
-                 classes=16, dimensions=128):
+                 classes=32, dimensions=128):
         self.max_degree = 1
         super().__init__(n,
                          class_distribution,
@@ -173,9 +187,40 @@ class StructureCSBM(MultiClassCSBM):
                 t = j // self.n + 1
                 q_hom = self.q_hom / t
                 q_het = self.q_het / t
-                if self.y[i] == self.y[j] and random.binomial(1, q_hom):
-                    self.edge_sources.append(i)
-                    self.edge_targets.append(j)
-                elif self.y[i] != self.y[j] and random.binomial(1, q_het):
-                    self.edge_sources.append(i)
-                    self.edge_targets.append(j)
+                self.set_edge(i, j, q_hom, q_het)
+
+
+class ClassLabelCSBM(MultiClassCSBM):
+    def __init__(self, n=5000, class_distribution=None, means=None, q_hom=0.005, q_het=0.001, sigma_square=0.01,
+                 classes=32, dimensions=128):
+        super().__init__(n, class_distribution, means, q_hom, q_het, sigma_square, classes, dimensions)
+
+    def evolve(self):
+        self.update_class_distribution()
+        super().evolve()
+
+    def update_class_distribution(self):
+        N = len(self.X)
+        t = N // self.n + 1
+        number_of_classes = max(self.classes - 2 * t, 1)
+        probabilities = np.zeros((self.classes,))
+        probabilities[:number_of_classes] = 1 / number_of_classes
+        self.p = probabilities
+
+
+class HomophilyCSBM(MultiClassCSBM):
+    def __init__(self, n=5000, class_distribution=None, means=None, q_hom=0.05, q_het=0.001, sigma_square=0.01,
+                 classes=32, dimensions=128):
+        super().__init__(n, class_distribution, means, q_hom, q_het, sigma_square, classes, dimensions)
+
+    def generate_edges(self):
+        end = len(self.X)
+        start = end - self.n
+        t = len(self.X) // self.n
+        q_hom = self.q_hom / t
+        q_het = self.q_het * t
+        for i in range(start, end):
+            for j in range(end):
+                if i == j:
+                    continue
+                self.set_edge(i, j, q_hom, q_het)
