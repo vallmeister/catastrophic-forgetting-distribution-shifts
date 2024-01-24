@@ -1,9 +1,9 @@
 import numpy as np
 import torch
-
-from metrics import mmd_max_rbf
 from numpy import random
 from torch_geometric.data import Data
+
+from metrics import mmd_max_rbf, total_variation_distance
 
 
 class MultiClassCSBM:
@@ -16,9 +16,9 @@ class MultiClassCSBM:
 
         self.X = np.empty([0, dimensions])
         self.y = np.empty([0], dtype=np.int32)
-        self.train_split = 0.8
-        self.val_split = 0.1
-        self.test_split = 0.1
+        self.train_split = 0.6
+        self.val_split = 0.2
+        self.test_split = 0.2
 
         if class_distribution and len(class_distribution) == classes:
             self.p = class_distribution
@@ -26,14 +26,7 @@ class MultiClassCSBM:
             self.p = np.full((classes,), 1 / classes)
         self.draw_class_labels()
 
-        if means:
-            if len(means) == classes and all(np.dot(m1, m2).round(6) == 0.0 for m1, m2 in means if m1 != m2):
-                self.means = means
-            else:
-                # TODO: Gram-Schmitt?
-                pass
-        else:
-            self.initialize_means()
+        self.initialize_means()
         self.draw_node_features()
 
         self.q_hom = q_hom
@@ -141,6 +134,20 @@ class MultiClassCSBM:
     def get_structure_shift_rbf_mmd(self):
         pass
 
+    def get_class_label_shift_tvd(self):
+        y_0 = self.y[:self.n]
+        y_1 = self.y[-self.n:]
+        P = [0] * self.classes
+        Q = [0] * self.classes
+        for label in y_0:
+            P[label] += 1
+        for label in y_1:
+            Q[label] += 1
+        for c in range(self.classes):
+            P[c] /= self.n
+            Q[c] /= self.n
+        return total_variation_distance(P, Q)
+
 
 class FeatureCSBM(MultiClassCSBM):
     def __init__(self, n=5000, class_distribution=None, means=None, q_hom=0.005, q_het=0.001, sigma_square=0.1,
@@ -161,6 +168,38 @@ class FeatureCSBM(MultiClassCSBM):
             new_mean /= np.linalg.norm(new_mean)
             new_means[i] = new_mean
         self.means = new_means
+
+    def get_average_pairwise_mean_distance(self):
+        distance = 0
+        num_pairs = 0
+        for i in range(self.classes):
+            for j in range(i + 1, self.classes):
+                distance += np.linalg.norm(self.means[i] - self.means[j])
+                num_pairs += 1
+        return distance / max(1, num_pairs)
+
+    def get_average_distance_between_curr_and_init_mean(self):
+        distance = 0
+        for i in range(self.classes):
+            distance += np.linalg.norm(self.means[i] - self.initial_means[i])
+        return distance / self.classes
+
+    def get_average_distance_from_neighboring_means(self):
+        distance = 0
+        for i in range(self.classes):
+            distance += np.linalg.norm(self.means[i] - self.means[(i + 1) % self.classes])
+        return distance / self.classes
+
+    def get_average_pairwise_distance_from_non_neighboring_means(self):
+        distance = 0
+        num_pairs = 0
+        for i in range(self.classes):
+            for j in range(i + 2, self.classes):
+                if (j + 1) % self.classes == i:
+                    continue
+                distance += np.linalg.norm(self.means[i] - self.means[j])
+                num_pairs += 1
+        return distance / num_pairs
 
 
 class StructureCSBM(MultiClassCSBM):
@@ -201,7 +240,7 @@ class ClassLabelCSBM(MultiClassCSBM):
 
     def update_class_distribution(self):
         N = len(self.X)
-        t = N // self.n + 1
+        t = N // self.n
         number_of_classes = max(self.classes - 2 * t, 1)
         probabilities = np.zeros((self.classes,))
         probabilities[:number_of_classes] = 1 / number_of_classes
