@@ -36,9 +36,6 @@ class MultiClassCSBM:
         self.edge_targets = []
         self.generate_edges()
 
-        self.data = None
-        self.build_graph()
-
     def initialize_means(self):
         self.means = np.zeros((self.classes, self.dimensions))
         ones_per_mean = self.dimensions / self.classes
@@ -84,19 +81,18 @@ class MultiClassCSBM:
             self.edge_sources.append(u)
             self.edge_targets.append(v)
 
-    def build_graph(self):
+    def get_data(self):
         edge_index = torch.tensor([self.edge_sources, self.edge_targets], dtype=torch.long)
         x = torch.tensor(self.X, dtype=torch.float)
         y = torch.tensor(self.y, dtype=torch.long)
         train_mask, validation_mask, test_mask = self.get_masks()
-        self.data = Data(x=x, edge_index=edge_index, y=y, train_mask=train_mask, val_mask=validation_mask,
-                         test_mask=test_mask)
+        return Data(x=x, edge_index=edge_index, y=y, train_mask=train_mask, val_mask=validation_mask,
+                    test_mask=test_mask)
 
     def evolve(self):
         self.draw_class_labels()
         self.draw_node_features()
         self.generate_edges()
-        self.build_graph()
 
     def set_split(self, train, val, test):
         if train + val + test != 1.0:
@@ -248,7 +244,7 @@ class ClassLabelCSBM(MultiClassCSBM):
 
 
 class HomophilyCSBM(MultiClassCSBM):
-    def __init__(self, n=5000, class_distribution=None, means=None, q_hom=0.05, q_het=0.001, sigma_square=0.01,
+    def __init__(self, n=5000, class_distribution=None, means=None, q_hom=0.005, q_het=0.001, sigma_square=0.01,
                  classes=32, dimensions=128):
         super().__init__(n, class_distribution, means, q_hom, q_het, sigma_square, classes, dimensions)
 
