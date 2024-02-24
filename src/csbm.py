@@ -16,9 +16,9 @@ class MultiClassCSBM:
 
         self.X = np.empty([0, dimensions])
         self.y = np.empty([0], dtype=np.int32)
-        self.train_split = 0.6
-        self.val_split = 0.2
-        self.test_split = 0.2
+        self.train_split = 0.8
+        self.val_split = 0.1
+        self.test_split = 0.1
 
         if class_distribution and len(class_distribution) == classes:
             self.p = class_distribution
@@ -160,7 +160,7 @@ class FeatureCSBM(MultiClassCSBM):
         for i in range(self.classes):
             curr_mean = self.means[i]
             initial_mean, next_initial_mean = self.initial_means[i], self.initial_means[(i + 1) % self.classes]
-            new_mean = curr_mean + 0.1 * (next_initial_mean - initial_mean)
+            new_mean = curr_mean + self.sigma_square * (next_initial_mean - initial_mean)
             new_mean /= np.linalg.norm(new_mean)
             new_means[i] = new_mean
         self.means = new_means
@@ -237,7 +237,7 @@ class ClassLabelCSBM(MultiClassCSBM):
     def update_class_distribution(self):
         N = len(self.X)
         t = N // self.n
-        number_of_classes = max(self.classes - 2 * t, 1)
+        number_of_classes = max(self.classes - 3 * t, 1)
         probabilities = np.zeros((self.classes,))
         probabilities[:number_of_classes] = 1 / number_of_classes
         self.p = probabilities
@@ -252,8 +252,8 @@ class HomophilyCSBM(MultiClassCSBM):
         end = len(self.X)
         start = end - self.n
         t = len(self.X) // self.n
-        q_hom = self.q_hom / t
-        q_het = self.q_het * t
+        q_hom = self.q_hom / t ** 2
+        q_het = self.q_het / t
         for i in range(start, end):
             for j in range(end):
                 if i == j:
