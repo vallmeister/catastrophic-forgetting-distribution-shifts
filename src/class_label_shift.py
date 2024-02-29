@@ -9,7 +9,7 @@
 import matplotlib.pyplot as plt
 
 from csbm import MultiClassCSBM, ClassLabelCSBM
-from metrics import total_variation_distance
+from measures import total_variation_distance
 
 
 # In[2]:

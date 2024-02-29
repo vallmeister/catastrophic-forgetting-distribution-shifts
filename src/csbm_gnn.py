@@ -3,14 +3,14 @@
 
 # # Using CSBM generated data to train a model
 
-# In[2]:
+# In[1]:
 
 
 import torch
 import matplotlib.pyplot as plt
 
 
-# In[6]:
+# In[2]:
 
 
 n = 5000
@@ -19,14 +19,18 @@ c = 32
 d = 128
 
 
-# In[7]:
+# In[3]:
 
 
-data_list_constant = torch.load('./csbm/csbm.pt')
-data_list_struct = torch.load('./csbm/csbm_struct.pt')
+base_dl = torch.load('./csbm/csbm_base.pt')
+zero_dl = torch.load('./csbm/csbm_zero.pt')
+feat_dl = torch.load('./csbm/csbm_feat.pt')
+struct_dl = torch.load('./csbm/csbm_struct.pt')
+homophily_dl = torch.load('./csbm/csbm_hom.pt')
+class_dl = torch.load('./csbm/csbm_class.pt')
 
 
-# In[8]:
+# In[4]:
 
 
 import torch.nn.functional as F
@@ -51,47 +55,33 @@ class GCN(torch.nn.Module):
 
 # ## Retrain model for each task
 
-# In[9]:
-
-
-def train_from_1_to_t(model, data_list):
-    print('\n' + 10 * '-' + ' Training and evaluating the model on each task ' + 10 * '-')
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=5e-4)
-    results = []
-    for task, data in enumerate(data_list):
-        data = data.to(device)
-        model.train()
-        for epoch in range(200):
-            optimizer.zero_grad()
-            out = model(data)
-            loss = F.nll_loss(out[data.train_mask], data.y[data.train_mask])
-            loss.backward()
-            optimizer.step()
-        model.eval()
-        pred = model(data).argmax(dim=1)
-        correct = (pred[data.test_mask] == data.y[data.test_mask]).sum()
-        acc = int(correct) / int(data.test_mask.sum())
-        print(f'Task {task+1:02d}, Accuracy: {acc:.4f}')
-        results.append(acc)
-    return results
-
-
 # In[12]:
 
 
-from metrics import Result
+from measures import Result
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(device)
+torch.set_printoptions(precision=2)
 
-time_steps = list(range(T))
-model_constant = GCN().to(device)
-model_struct = GCN().to(device)
-result_constant = Result(model_constant, data_list_constant)
-result_struct = Result(model_struct, data_list_struct)
+base_result = Result(GCN().to(device), base_dl)
+zero_result = Result(GCN().to(device), zero_dl)
+feat_result = Result(GCN().to(device), feat_dl)
+struct_result = Result(GCN().to(device), struct_dl)
+homophily_result = Result(GCN().to(device), homophily_dl)
+class_result = Result(GCN().to(device), class_dl)
 
-result_constant.learn()
-result_struct.learn()
+results = [base_result, zero_result, feat_result, struct_result, homophily_result, class_result]
+names = {base_result: 'Base-CSBM',
+         zero_result: 'Zero-CSBM',
+         feat_result: 'Feature-CSBM',
+         struct_result: 'Structure-CSBM',
+         homophily_result: 'Homophily-CSBM',
+         class_result: 'Class-CSBM'}
+for result in results:
+    result.learn()
 
-print(f'{result_constant.get_result_matrix():.3f}')
-print(result_constant.get_result_matrix())
+for result in results:
+    print('\n' + 10 * '=' + f' {names[result]} ' + 10 * '=')
+    print(result.get_result_matrix)
+    print(f'\n AP: {result.get_average_accuracy():.2f}'.ljust(10) + f'AF: {result.get_average_forgetting_measure():.2f}')
 

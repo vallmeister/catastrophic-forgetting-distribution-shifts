@@ -3,12 +3,12 @@ import torch
 from numpy import random
 from torch_geometric.data import Data
 
-from metrics import mmd_max_rbf, total_variation_distance
+from measures import mmd_max_rbf, total_variation_distance
 
 
 class MultiClassCSBM:
     def __init__(self, n=5000, class_distribution=None, means=None, q_hom=0.005, q_het=0.001, sigma_square=0.1,
-                 classes=32, dimensions=128):
+                 classes=16, dimensions=128):
         self.n = n
         self.sigma_square = sigma_square
         self.classes = classes
@@ -147,7 +147,7 @@ class MultiClassCSBM:
 
 class FeatureCSBM(MultiClassCSBM):
     def __init__(self, n=5000, class_distribution=None, means=None, q_hom=0.005, q_het=0.001, sigma_square=0.1,
-                 classes=32, dimensions=128):
+                 classes=16, dimensions=128):
         super().__init__(n, class_distribution, means, q_hom, q_het, sigma_square, classes, dimensions)
         self.initial_means = self.means
 
@@ -201,7 +201,7 @@ class FeatureCSBM(MultiClassCSBM):
 class StructureCSBM(MultiClassCSBM):
 
     def __init__(self, n=5000, class_distribution=None, means=None, q_hom=0.05, q_het=0.01, sigma_square=0.1,
-                 classes=32, dimensions=128):
+                 classes=16, dimensions=128):
         self.max_degree = 1
         super().__init__(n,
                          class_distribution,
@@ -226,8 +226,8 @@ class StructureCSBM(MultiClassCSBM):
 
 
 class ClassLabelCSBM(MultiClassCSBM):
-    def __init__(self, n=5000, class_distribution=None, means=None, q_hom=0.005, q_het=0.001, sigma_square=0.01,
-                 classes=32, dimensions=128):
+    def __init__(self, n=5000, class_distribution=None, means=None, q_hom=0.005, q_het=0.001, sigma_square=0.1,
+                 classes=16, dimensions=128):
         super().__init__(n, class_distribution, means, q_hom, q_het, sigma_square, classes, dimensions)
 
     def evolve(self):
@@ -244,8 +244,8 @@ class ClassLabelCSBM(MultiClassCSBM):
 
 
 class HomophilyCSBM(MultiClassCSBM):
-    def __init__(self, n=5000, class_distribution=None, means=None, q_hom=0.005, q_het=0.001, sigma_square=0.01,
-                 classes=32, dimensions=128):
+    def __init__(self, n=5000, class_distribution=None, means=None, q_hom=0.005, q_het=0.001, sigma_square=0.1,
+                 classes=16, dimensions=128):
         super().__init__(n, class_distribution, means, q_hom, q_het, sigma_square, classes, dimensions)
 
     def generate_edges(self):

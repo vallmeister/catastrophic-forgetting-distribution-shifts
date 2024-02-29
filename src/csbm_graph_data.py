@@ -10,8 +10,7 @@ import numpy as np
 import os
 import torch
 
-from csbm import MultiClassCSBM, FeatureCSBM, StructureCSBM
-from CSBMhet import CSBMhet
+from csbm import MultiClassCSBM, FeatureCSBM, StructureCSBM, ClassLabelCSBM, HomophilyCSBM
 
 
 # In[3]:
@@ -22,43 +21,54 @@ np.set_printoptions(precision=3)
 
 n = 50
 
-csbm = MultiClassCSBM(n=n)
+csbm_base = MultiClassCSBM(n=n)
 csbm_zero = MultiClassCSBM(n=10*n)
-csbm_het = CSBMhet(n=n)
+csbm_feat = FeatureCSBM(n=n)
 csbm_struct = StructureCSBM(n=n)
-
-
-# In[4]:
-
-
-csbm_data_list = [csbm.get_data()]
-csbm_het_data_list = [csbm_het.get_data()]
-csbm_struct_data_list = [csbm_struct.get_data()]
+csbm_hom = HomophilyCSBM(n=n)
+csbm_class = ClassLabelCSBM(n=n)
 
 
 # In[5]:
 
 
-for i in range(9):
-    csbm.evolve()
-    csbm_data_list.append(csbm.get_data())
-    
-    csbm_het.evolve()
-    csbm_het_data_list.append(csbm_het.get_data())
-    
-    csbm_struct.evolve()
-    csbm_struct_data_list.append(csbm_struct.get_data())
+base_dl = [csbm_base.get_data()]
+zero_dl = [csbm_zero.get_data()]
+feat_dl = [csbm_struct.get_data()]
+struct_dl = [csbm_struct.get_data()]
+hom_dl = [csbm_hom.get_data()]
+class_dl = [csbm_class.get_data()]
 
-
-# ## Simply by hand
 
 # In[6]:
 
 
+for i in range(9):
+    csbm_base.evolve()
+    base_dl.append(csbm_base.get_data())
+    
+    csbm_feat.evolve()
+    feat_dl.append(csbm_feat.get_data())
+    
+    csbm_struct.evolve()
+    struct_dl.append(csbm_struct.get_data())
+
+    csbm_hom.evolve()
+    hom_dl.append(csbm_hom.get_data())
+
+    csbm_class.evolve()
+    class_dl.append(csbm_class.get_data())
+
+
+# In[7]:
+
+
 os.makedirs('./csbm/', exist_ok=True)
 
-torch.save(csbm_zero.get_data(), './csbm/csbm_zero.pt')
-torch.save(csbm_data_list, './csbm/csbm.pt')
-torch.save(csbm_het_data_list, './csbm/csbm_het.pt')
-torch.save(csbm_struct_data_list, './csbm/csbm_struct.pt')
+torch.save(base_dl, './csbm/csbm_base.pt')
+torch.save(zero_dl, './csbm/csbm_zero.pt')
+torch.save(feat_dl, './csbm/csbm_feat.pt')
+torch.save(struct_dl, './csbm/csbm_struct.pt')
+torch.save(hom_dl, './csbm/csbm_hom.pt')
+torch.save(class_dl, './csbm/csbm_class.pt')
 

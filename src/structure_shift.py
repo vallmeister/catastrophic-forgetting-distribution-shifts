@@ -7,15 +7,12 @@
 
 
 import matplotlib.pyplot as plt
-import numpy as np
-import sys
-from metrics import mmd_max_rbf
-
 import torch
-from torch_geometric.nn import Node2Vec
+from measures import mmd_max_rbf
+from node2vec_embedding import max_node2vec_embedding
 
 
-# In[13]:
+# In[2]:
 
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -24,18 +21,19 @@ n = 5000
 T = 10
 
 
-# In[8]:
+# In[10]:
 
 
-data = torch.load('./csbm/csbm.pt')[-1]
-data_het = torch.load('./csbm/csbm_het.pt')[-1]
-data_struct = torch.load('./csbm/csbm_struct.pt')[-1]
-data_zero = torch.load('./csbm/csbm_zero.pt')
-names = {0: 'CSBM-Constant',
-         1: 'CSBM-Het',
-         2: 'CSBM-Struct',
-         3: 'CSBM-Zero'}
-all_data = [data, data_het, data_struct, data_zero]
+base = torch.load('./csbm/csbm_base.pt')[-1]
+zero = torch.load('./csbm/csbm_zero.pt')[-1]
+struct = torch.load('./csbm/csbm_struct.pt')[-1]
+homophily = torch.load('./csbm/csbm_hom.pt')[-1]
+
+names = {0: 'Base-CSBM',
+         1: 'Zero-CSBM',
+         2: 'Structure-CSBM',
+         3: 'Homophily-CSBM'}
+all_data = [base, zero, struct, homophily]
 
 
 # In[11]:
@@ -45,19 +43,19 @@ for i in range(len(all_data)):
         print(f'{names[i]}'.ljust(15) + f'{len(all_data[i].edge_index[0])} edges'.rjust(15))
 
 
-# In[12]:
+# In[ ]:
 
 
 def get_node_embeddings(data, name):
     model = Node2Vec(
     data.edge_index,
     embedding_dim=128,
-    walk_length=80,
-    context_size=10,
+    walk_length=250,
+    context_size=100,
     walks_per_node=10,
     num_negative_samples=1,
     p=1.0,
-    q=2.0).to(device)
+    q=1.0).to(device)
     
     num_workers = 4 if sys.platform == 'linux' else 0
     loader = model.loader(batch_size=32, shuffle=True, num_workers=num_workers)
@@ -65,10 +63,10 @@ def get_node_embeddings(data, name):
 
     N = len(data.x)
     train_mask = torch.zeros(n, dtype=torch.bool)
-    train_mask[:int(0.5 * n)] = 1
+    train_mask[:int(0.9 * n)] = 1
     train_mask = train_mask.repeat(N // n)
     test_mask = torch.zeros(n, dtype=torch.bool)
-    test_mask[-int(0.5 * n):] = 1
+    test_mask[-int(0.1 * n):] = 1
     test_mask = test_mask.repeat(N // n)
     
     def train():
@@ -96,12 +94,12 @@ def get_node_embeddings(data, name):
         return acc
     max_loss = 0
     max_acc = 0
-    for epoch in range(150):
+    for epoch in range(100):
         loss = train()
         max_loss = max(max_loss, loss)
         acc = test()
         max_acc = max(acc, max_acc)
-    print(f'{name}'.ljust(15) + f'Loss: {max_loss:.3f}, Acc: {max_acc:.4f}')
+    print(f'{name}'.ljxust(15) + f'Loss: {max_loss:.3f}, Acc: {max_acc:.4f}')
     return model.embedding.weight.cpu().detach().numpy()
 
 
@@ -111,10 +109,10 @@ def get_node_embeddings(data, name):
 embeddings = []
 for i in range(len(all_data)):
     embeddings.append(get_node_embeddings(all_data[i], names[i]))
-emb_const, emb_het, emb_struct, emb_zero = embeddings
+emb_base, emb_zero, emb_struct, emb_hom = embeddings
 
 
-# In[14]:
+# In[ ]:
 
 
 def get_rbf_mmd(embedding):
@@ -129,25 +127,25 @@ def get_rbf_mmd(embedding):
 # In[ ]:
 
 
-mmds_rbf_const = get_rbf_mmd(emb_const)
-mmds_rbf_het = get_rbf_mmd(emb_het)
-mmds_rbf_struct = get_rbf_mmd(emb_struct)
-mmds_rbf_zero = get_rbf_mmd(emb_zero)
+mmd_base = get_rbf_mmd(emb_base)
+mmd_zero = get_rbf_mmd(emb_zero)
+mmd_struct = get_rbf_mmd(emb_struct)
+mmd_hom = get_rbf_mmd(emb_hom)
 
 
 # In[ ]:
 
 
 # plot
-plt.figure(figsize=(8, 4))
+plt.figure(figsize=(6, 3))
 
-plt.plot(time_steps, mmds_rbf_const, marker='o', linestyle='-', color='black', label='CSBM-Const')
-plt.plot(time_steps, mmds_rbf_zero, marker='o', linestyle='-', color='gray', label='CSBM-Zero')
-plt.plot(time_steps, mmds_rbf_het, marker='o', linestyle='-', color='orange', label='CSBM-Het')
-plt.plot(time_steps, mmds_rbf_struct, marker='o', linestyle='-', color='blue', label='CSBM-Struct')
+plt.plot(time_steps, mmd_base, marker='o', linestyle='-', color='black', label='Base-CSBM')
+plt.plot(time_steps, mmd_zero, marker='o', linestyle='-', color='gray', label='Zero-CSBM')
+plt.plot(time_steps, mmd_hom, marker='o', linestyle='-', color='orange', label='Homophily-CSBM')
+plt.plot(time_steps, mmd_struct, marker='o', linestyle='-', color='blue', label='Structure-CSBM')
 
 plt.title(r'Graph structure-shift for different CSBMs')
-plt.xlabel('Time Steps')
+plt.xlabel(r'$t$')
 plt.ylabel(r'$MMD^{2}$ with RBF-kernel')
 plt.grid(True)
 plt.legend(loc='lower right')
@@ -156,7 +154,7 @@ plt.savefig('structure_shift_rbf.pdf', format='pdf')
 plt.close()
 
 
-# In[16]:
+# In[ ]:
 
 
 for i in range(len(all_data)):
