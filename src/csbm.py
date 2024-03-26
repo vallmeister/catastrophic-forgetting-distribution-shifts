@@ -20,7 +20,7 @@ class MultiClassCSBM:
         self.val_split = 0.1
         self.test_split = 0.1
 
-        if class_distribution and len(class_distribution) == classes:
+        if class_distribution is not None and len(class_distribution) == classes:
             self.p = class_distribution
         else:
             self.p = np.full((classes,), 1 / classes)
@@ -225,22 +225,39 @@ class StructureCSBM(MultiClassCSBM):
                 self.set_edge(i, j, q_hom, q_het)
 
 
-class ClassLabelCSBM(MultiClassCSBM):
+class ClassCSBM(MultiClassCSBM):
     def __init__(self, n=5000, class_distribution=None, means=None, q_hom=0.005, q_het=0.001, sigma_square=0.1,
                  classes=16, dimensions=128):
-        super().__init__(n, class_distribution, means, q_hom, q_het, sigma_square, classes, dimensions)
+
+        def ir_iter():
+            yield 50
+            yield 40
+            yield 30
+            yield 20
+            yield 10
+            yield 5
+            yield 4
+            yield 3
+            yield 2
+            yield 1
+
+        self.imbalance_ratios = ir_iter()
+        super().__init__(n, self.get_class_distribution(classes), means, q_hom, q_het, sigma_square, classes,
+                         dimensions)
 
     def evolve(self):
-        self.update_class_distribution()
+        self.p = self.get_class_distribution(self.classes)
         super().evolve()
 
-    def update_class_distribution(self):
-        N = len(self.X)
-        t = N // self.n
-        number_of_classes = max(self.classes - 3 * t, 1)
-        probabilities = np.zeros((self.classes,))
-        probabilities[:number_of_classes] = 1 / number_of_classes
-        self.p = probabilities
+    def get_class_distribution(self, c):
+        rho = next(self.imbalance_ratios)
+        probabilities = np.zeros((c,))
+        for k in range(c):
+            probabilities[k] = (1 / rho) ** (k / (c - 1))
+        s = np.sum(probabilities)
+        for k in range(c):
+            probabilities[k] /= s
+        return probabilities
 
 
 class HomophilyCSBM(MultiClassCSBM):

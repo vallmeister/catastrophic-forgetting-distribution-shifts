@@ -8,7 +8,7 @@
 
 import matplotlib.pyplot as plt
 
-from csbm import MultiClassCSBM, ClassLabelCSBM
+from csbm import MultiClassCSBM, ClassCSBM
 from measures import total_variation_distance
 
 
@@ -24,7 +24,7 @@ t = 17
 
 
 csbm = MultiClassCSBM(n=n, classes=c)
-csbm_class = ClassLabelCSBM(n=n, classes=c)
+csbm_class = ClassCSBM(n=n, classes=c)
 
 initial_p = csbm_class.p
 current_p = [0] * c
