@@ -15,22 +15,11 @@ import matplotlib.pyplot as plt
 
 n = 5000
 T = 10
-c = 32
+c = 16
 d = 128
 
 
 # In[3]:
-
-
-base_dl = torch.load('./csbm/csbm_base.pt')
-zero_dl = torch.load('./csbm/csbm_zero.pt')
-feat_dl = torch.load('./csbm/csbm_feat.pt')
-struct_dl = torch.load('./csbm/csbm_struct.pt')
-homophily_dl = torch.load('./csbm/csbm_hom.pt')
-class_dl = torch.load('./csbm/csbm_class.pt')
-
-
-# In[4]:
 
 
 import torch.nn.functional as F
@@ -55,33 +44,42 @@ class GCN(torch.nn.Module):
 
 # ## Retrain model for each task
 
-# In[12]:
+# In[ ]:
 
 
 from measures import Result
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-print(device)
-torch.set_printoptions(precision=2)
 
-base_result = Result(GCN().to(device), base_dl)
-zero_result = Result(GCN().to(device), zero_dl)
-feat_result = Result(GCN().to(device), feat_dl)
-struct_result = Result(GCN().to(device), struct_dl)
-homophily_result = Result(GCN().to(device), homophily_dl)
-class_result = Result(GCN().to(device), class_dl)
+for i in range(10):
+    base_dl = torch.load(f'./csbm_base/base_{i}.pt')
+    zero_dl = torch.load(f'./csbm_zero/zero_{i}.pt')
+    feat_dl = torch.load(f'./csbm_feat/feat_{i}.pt')
+    struct_dl = torch.load(f'./csbm_hom/hom_{i}.pt')
+    homophily_dl = torch.load(f'./csbm_struct/struct_{i}.pt')
+    class_dl = torch.load(f'./csbm_class/class_{i}.pt')
 
-results = [base_result, zero_result, feat_result, struct_result, homophily_result, class_result]
-names = {base_result: 'Base-CSBM',
-         zero_result: 'Zero-CSBM',
-         feat_result: 'Feature-CSBM',
-         struct_result: 'Structure-CSBM',
-         homophily_result: 'Homophily-CSBM',
-         class_result: 'Class-CSBM'}
-for result in results:
-    result.learn()
-
-for result in results:
-    print('\n' + 10 * '=' + f' {names[result]} ' + 10 * '=')
-    print(result.get_result_matrix)
-    print(f'\n AP: {result.get_average_accuracy():.2f}'.ljust(10) + f'AF: {result.get_average_forgetting_measure():.2f}')
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print(device)
+    torch.set_printoptions(precision=2)
+    
+    base_result = Result(GCN().to(device), base_dl)
+    zero_result = Result(GCN().to(device), zero_dl)
+    feat_result = Result(GCN().to(device), feat_dl)
+    struct_result = Result(GCN().to(device), struct_dl)
+    homophily_result = Result(GCN().to(device), homophily_dl)
+    class_result = Result(GCN().to(device), class_dl)
+    
+    results = [base_result, zero_result, feat_result, struct_result, homophily_result, class_result]
+    names = {base_result: 'Base-CSBM',
+             zero_result: 'Zero-CSBM',
+             feat_result: 'Feature-CSBM',
+             struct_result: 'Structure-CSBM',
+             homophily_result: 'Homophily-CSBM',
+             class_result: 'Class-CSBM'}
+    for result in results:
+        result.learn()
+    
+    for result in results:
+        print('\n' + 10 * '=' + f' {names[result]} ' + 10 * '=')
+        print(result.get_result_matrix())
+        print(f'\n AP: {result.get_average_accuracy():.2f}'.ljust(10) + f' AF: {result.get_average_forgetting_measure():.2f}')
 

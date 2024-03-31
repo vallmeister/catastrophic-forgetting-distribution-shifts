@@ -52,7 +52,7 @@ class Result:
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         data = data.to(device)
         self.model.train()
-        for epoch in range(500):
+        for epoch in range(200):
             self.optimizer.zero_grad()
             out = self.model(data)
             loss = F.nll_loss(out[data.train_mask], data.y[data.train_mask])
@@ -79,7 +79,7 @@ class Result:
         return 1 / tasks * sum(self.result_matrix[tasks - 1][i] for i in range(tasks))
 
     def get_forgetting_measure(self, i, j):
-        return max(self.result_matrix[k][i] for k in range(j)) - self.result_matrix[j][i]
+        return max(self.result_matrix[k][i].item() for k in range(j)) - self.result_matrix[j][i].item()
 
     def get_average_forgetting_measure(self):
         tasks = len(self.data_list)

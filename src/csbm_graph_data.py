@@ -13,16 +13,13 @@ import torch
 from csbm import MultiClassCSBM, FeatureCSBM, StructureCSBM, ClassCSBM, HomophilyCSBM
 
 
-# In[6]:
+# In[5]:
 
 
-torch.set_printoptions(precision=3)
-np.set_printoptions(precision=3)
-
-n = 50
+n = 5000
 
 
-# In[8]:
+# In[3]:
 
 
 os.makedirs('./csbm_base/', exist_ok=True)
@@ -33,7 +30,7 @@ os.makedirs('./csbm_hom/', exist_ok=True)
 os.makedirs('./csbm_class/', exist_ok=True)
 
 
-# In[9]:
+# In[4]:
 
 
 for i in range(10):
@@ -68,9 +65,9 @@ for i in range(10):
         class_dl.append(csbm_class.get_data())
 
     torch.save(base_dl, f'./csbm_base/base_{i}.pt')
-    torch.save(base_dl, f'./csbm_zero/zero_{i}.pt')
-    torch.save(base_dl, f'./csbm_feat/feat_{i}.pt')
-    torch.save(base_dl, f'./csbm_struct/struct_{i}.pt')
-    torch.save(base_dl, f'./csbm_hom/hom_{i}.pt')
-    torch.save(base_dl, f'./csbm_class/class_{i}.pt')
+    torch.save(zero_dl, f'./csbm_zero/zero_{i}.pt')
+    torch.save(feat_dl, f'./csbm_feat/feat_{i}.pt')
+    torch.save(struct_dl, f'./csbm_struct/struct_{i}.pt')
+    torch.save(hom_dl, f'./csbm_hom/hom_{i}.pt')
+    torch.save(class_dl, f'./csbm_class/class_{i}.pt')
 

@@ -1,0 +1,15 @@
+---
+experiments:
+  - name: 'base_'
+    directory: './csbm_base/'
+  - name: 'zero_'
+    directory: './csbm_zero/'
+  - name: 'feat_'
+    directory: './csbm_feat/'
+  - name: 'struct_'
+    directory: './csbm_struct/'
+  - name: 'hom_'
+    directory: './csbm_hom/'
+  - name: 'class_'
+    directory: './csbm_class/'
+  
