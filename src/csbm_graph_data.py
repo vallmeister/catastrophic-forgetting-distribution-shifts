@@ -13,10 +13,10 @@ import torch
 from csbm import MultiClassCSBM, FeatureCSBM, StructureCSBM, ClassCSBM, HomophilyCSBM
 
 
-# In[5]:
+# In[2]:
 
 
-n = 5000
+n = 200
 
 
 # In[3]:
@@ -34,40 +34,17 @@ os.makedirs('./csbm_class/', exist_ok=True)
 
 
 for i in range(10):
-    csbm_base = MultiClassCSBM(n=n)
-    csbm_zero = MultiClassCSBM(n=10*n)
-    csbm_feat = FeatureCSBM(n=n)
-    csbm_struct = StructureCSBM(n=n)
-    csbm_hom = HomophilyCSBM(n=n)
-    csbm_class = ClassCSBM(n=n)
-
-    base_dl = [csbm_base.get_data()]
-    zero_dl = [csbm_zero.get_data()]
-    feat_dl = [csbm_struct.get_data()]
-    struct_dl = [csbm_struct.get_data()]
-    hom_dl = [csbm_hom.get_data()]
-    class_dl = [csbm_class.get_data()]
-
-    for t in range(9):
-        csbm_base.evolve()
-        base_dl.append(csbm_base.get_data())
-        
-        csbm_feat.evolve()
-        feat_dl.append(csbm_feat.get_data())
-        
-        csbm_struct.evolve()
-        struct_dl.append(csbm_struct.get_data())
+    base_csbm = MultiClassCSBM(n=n).generate_data(10)
+    zero_csbm = MultiClassCSBM(n=10*n).generate_data()
+    feat_csbm = FeatureCSBM(n=n).generate_data(10)
+    struct_csbm = StructureCSBM(n=n).generate_data(10)
+    hom_csbm = HomophilyCSBM(n=n).generate_data(10)
+    class_csbm = ClassCSBM(n=n).generate_data(10)
     
-        csbm_hom.evolve()
-        hom_dl.append(csbm_hom.get_data())
-    
-        csbm_class.evolve()
-        class_dl.append(csbm_class.get_data())
-
-    torch.save(base_dl, f'./csbm_base/base_{i}.pt')
-    torch.save(zero_dl, f'./csbm_zero/zero_{i}.pt')
-    torch.save(feat_dl, f'./csbm_feat/feat_{i}.pt')
-    torch.save(struct_dl, f'./csbm_struct/struct_{i}.pt')
-    torch.save(hom_dl, f'./csbm_hom/hom_{i}.pt')
-    torch.save(class_dl, f'./csbm_class/class_{i}.pt')
+    torch.save(base_csbm, f'./csbm_base/base_{i}.pt')
+    torch.save(zero_csbm, f'./csbm_zero/zero_{i}.pt')
+    torch.save(feat_csbm, f'./csbm_feat/feat_{i}.pt')
+    torch.save(struct_csbm, f'./csbm_struct/struct_{i}.pt')
+    torch.save(hom_csbm, f'./csbm_hom/hom_{i}.pt')
+    torch.save(class_csbm, f'./csbm_class/class_{i}.pt')
 

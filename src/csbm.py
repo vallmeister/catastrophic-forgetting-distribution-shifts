@@ -10,42 +10,32 @@ class MultiClassCSBM:
     def __init__(self, n=5000, class_distribution=None, means=None, q_hom=0.005, q_het=0.001, sigma_square=0.1,
                  classes=16, dimensions=128):
         self.n = n
-        self.sigma_square = sigma_square
         self.classes = classes
         self.dimensions = dimensions
-
-        self.X = np.empty([0, dimensions])
-        self.y = np.empty([0], dtype=np.int32)
-        self.train_split = 0.8
-        self.val_split = 0.1
-        self.test_split = 0.1
-
-        if class_distribution is not None and len(class_distribution) == classes:
-            self.p = class_distribution
-        else:
-            self.p = np.full((classes,), 1 / classes)
-        self.draw_class_labels()
-
-        self.initialize_means()
-        self.draw_node_features()
-
+        self.sigma_square = sigma_square
         self.q_hom = q_hom
         self.q_het = q_het
 
+        self.means = self.initialize_means()
+        self.p = np.full((classes,), 1 / classes)
+
+        self.X = np.empty([0, dimensions], dtype=np.float64)
+        self.y = np.empty([0], dtype=np.int32)
+        self.timestamps = np.empty([0], dtype=np.int32)
         self.edge_sources = []
         self.edge_targets = []
-        self.generate_edges()
 
     def initialize_means(self):
-        self.means = np.zeros((self.classes, self.dimensions))
+        means = np.zeros((self.classes, self.dimensions))
         ones_per_mean = self.dimensions / self.classes
         curr_mean = 0
         for i in range(self.dimensions):
             if i >= (curr_mean + 1) * ones_per_mean:
                 curr_mean += 1
-            self.means[curr_mean][i] = 1.0
+            means[curr_mean][i] = 1.0
         for i in range(self.classes):
-            self.means[i] = self.means[i] / np.linalg.norm(self.means[i])
+            means[i] = means[i] / np.linalg.norm(means[i])
+        return means
 
     def draw_class_labels(self):
         new_labels = random.choice(list(range(self.classes)), self.n, p=self.p)
@@ -85,36 +75,19 @@ class MultiClassCSBM:
         edge_index = torch.tensor([self.edge_sources, self.edge_targets], dtype=torch.long)
         x = torch.tensor(self.X, dtype=torch.float)
         y = torch.tensor(self.y, dtype=torch.long)
-        train_mask, validation_mask, test_mask = self.get_masks()
-        return Data(x=x, edge_index=edge_index, y=y, train_mask=train_mask, val_mask=validation_mask,
-                    test_mask=test_mask)
+        t = torch.tensor(self.timestamps, dtype=torch.int32)
+        return Data(x=x, edge_index=edge_index, y=y, t=t)
 
     def evolve(self):
         self.draw_class_labels()
         self.draw_node_features()
         self.generate_edges()
 
-    def set_split(self, train, val, test):
-        if train + val + test != 1.0:
-            raise ValueError("Split has to sum up to 1")
-        elif not 0 <= train <= 1 or not 0 <= val <= 1 or not 0 <= test <= 1:
-            raise ValueError("Split-values have to be in range [0,1]")
-        self.train_split, self.val_split, self.test_split = train, val, test
-
-    def get_masks(self):
-        train, val, test = self.train_split, self.val_split, self.test_split
-        n = self.n
-        N = len(self.X)
-        train_mask = torch.zeros(N, dtype=torch.bool)
-        train_mask[-n:-int(n * (val + test))] = 1
-
-        val_mask = torch.zeros(N, dtype=torch.bool)
-        val_mask[-int((val + test) * n):-int(n * test)] = 1
-
-        test_mask = torch.zeros(N, dtype=torch.bool)
-        test_mask[-int(test * n):] = 1
-
-        return train_mask, val_mask, test_mask
+    def generate_data(self, tasks=1):
+        for t in range(tasks):
+            self.timestamps = np.concatenate((self.timestamps, np.full((self.n,), t)))
+            self.evolve()
+        return self.get_data()
 
     def get_per_class_feature_shift_mmd_with_rbf_kernel(self):
         mmd = 0
@@ -152,8 +125,8 @@ class FeatureCSBM(MultiClassCSBM):
         self.initial_means = self.means
 
     def evolve(self):
-        self.update_means()
         super().evolve()
+        self.update_means()
 
     def update_means(self):
         new_means = np.zeros((self.classes, self.dimensions))
@@ -229,7 +202,7 @@ class ClassCSBM(MultiClassCSBM):
     def __init__(self, n=5000, class_distribution=None, means=None, q_hom=0.005, q_het=0.001, sigma_square=0.1,
                  classes=16, dimensions=128):
 
-        def ir_iter():
+        def rho_iter():
             yield 50
             yield 40
             yield 30
@@ -240,14 +213,15 @@ class ClassCSBM(MultiClassCSBM):
             yield 3
             yield 2
             yield 1
+            yield 1
 
-        self.imbalance_ratios = ir_iter()
+        self.imbalance_ratios = rho_iter()
         super().__init__(n, self.get_class_distribution(classes), means, q_hom, q_het, sigma_square, classes,
                          dimensions)
 
     def evolve(self):
-        self.p = self.get_class_distribution(self.classes)
         super().evolve()
+        self.p = self.get_class_distribution(self.classes)
 
     def get_class_distribution(self, c):
         rho = next(self.imbalance_ratios)
