@@ -9,7 +9,7 @@
 import matplotlib.pyplot as plt
 import torch
 from measures import mmd_max_rbf
-from node2vec_embedding import max_node2vec_embedding
+from node2vec_embedding import max_range_node2vec_embedding
 
 
 # In[2]:

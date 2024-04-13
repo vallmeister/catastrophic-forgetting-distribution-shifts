@@ -35,20 +35,18 @@ def total_variation_distance(P, Q):
 
 
 class Result:
-    def __init__(self, model, data_list):
-        self.model = model
-        self.optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=0.001)
+    def __init__(self, data_list, gnn):
         self.data_list = data_list
-        tasks = len(data_list)
-        self.result_matrix = torch.zeros(tasks, tasks)
+        self.model = gnn
+        self.optimizer = torch.optim.Adam(gnn.parameters(), lr=0.01, weight_decay=0.001)
+        self.result_matrix = torch.zeros(len(data_list), len(data_list))
 
     def get_result_matrix(self):
         return self.result_matrix
 
-    def train_model(self, task):
-        data = self.data_list[task]
+    def train_model(self, i):
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        data = data.to(device)
+        data = self.data_list[i].to(device)
         self.model.train()
         for epoch in range(200):
             self.optimizer.zero_grad()
@@ -57,19 +55,18 @@ class Result:
             loss.backward()
             self.optimizer.step()
 
-    def test_model(self, task):
+    def test_model(self, i):
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        data = self.data_list[task].to(device)
+        data = self.data_list[i].to(device)
         self.model.eval()
         pred = self.model(data).argmax(dim=1)
         correct = (pred[data.test_mask] == data.y[data.test_mask]).sum()
         return int(correct) / int(data.test_mask.sum())
 
     def learn(self):
-        tasks = len(self.data_list)
-        for i in range(tasks):
+        for i in range(len(self.result_matrix)):
             self.train_model(i)
-            for j in range(tasks):
+            for j in range(len(self.result_matrix)):
                 self.result_matrix[i][j] = self.test_model(j)
 
     def get_average_accuracy(self):
@@ -81,4 +78,7 @@ class Result:
 
     def get_average_forgetting_measure(self):
         tasks = len(self.data_list)
-        return 1 / (max(1, tasks - 1)) * sum(self.get_forgetting_measure(i, tasks - 1) for i in range(tasks))
+        if tasks > 1:
+            return 1 / (max(1, tasks - 1)) * sum(self.get_forgetting_measure(i, tasks - 1) for i in range(tasks))
+        else:
+            return 0

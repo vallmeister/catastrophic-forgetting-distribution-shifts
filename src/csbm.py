@@ -1,8 +1,10 @@
 import numpy as np
 import torch
 from numpy import random
+from sklearn.model_selection import train_test_split
 from torch_geometric.data import Data
 
+from datasets import get_masks
 from measures import mmd_max_rbf, total_variation_distance
 
 
@@ -19,11 +21,15 @@ class MultiClassCSBM:
         self.means = self.initialize_means()
         self.p = np.full((classes,), 1 / classes)
 
-        self.X = np.empty([0, dimensions], dtype=np.float64)
+        self.x = np.empty([0, dimensions], dtype=np.float64)
         self.y = np.empty([0], dtype=np.int32)
-        self.timestamps = np.empty([0], dtype=np.int32)
+        self.timestep = np.empty([0], dtype=np.int32)
         self.edge_sources = []
         self.edge_targets = []
+
+        self.draw_class_labels()
+        self.draw_node_features()
+        self.generate_edges()
 
     def initialize_means(self):
         means = np.zeros((self.classes, self.dimensions))
@@ -42,17 +48,21 @@ class MultiClassCSBM:
         self.y = np.concatenate((self.y, new_labels))
 
     def draw_node_features(self):
+        t = len(self.x) // self.n
+        curr_timestep = np.full(self.n, t)
+        self.timestep = np.concatenate((self.timestep, curr_timestep))
+
         cov = self.sigma_square * np.eye(self.dimensions)
-        offset = len(self.X)
+        offset = len(self.x)
         node_features = np.zeros((self.n, self.dimensions))
         for i in range(offset, offset + self.n):
             class_label = self.y[i]
             class_mean = self.means[class_label]
             node_features[i - offset] = random.multivariate_normal(class_mean, cov, 1)
-        self.X = np.concatenate((self.X, node_features))
+        self.x = np.concatenate((self.x, node_features))
 
     def generate_edges(self):
-        end = len(self.X)
+        end = len(self.x)
         start = end - self.n
         t = end // self.n
         q_hom = self.q_hom / t
@@ -73,28 +83,23 @@ class MultiClassCSBM:
 
     def get_data(self):
         edge_index = torch.tensor([self.edge_sources, self.edge_targets], dtype=torch.long)
-        x = torch.tensor(self.X, dtype=torch.float)
+        x = torch.tensor(self.x, dtype=torch.float)
         y = torch.tensor(self.y, dtype=torch.long)
-        t = torch.tensor(self.timestamps, dtype=torch.int32)
-        return Data(x=x, edge_index=edge_index, y=y, t=t)
+        t = torch.tensor(self.timestep, dtype=torch.int32)
+        train_mask, val_mask, test_mask = get_masks(len(self.x), self.n, 0.8, 0.1, 0.1)
+        return Data(x=x, edge_index=edge_index, y=y, t=t, train_mask=train_mask, val_mask=val_mask, test_mask=test_mask)
 
     def evolve(self):
         self.draw_class_labels()
         self.draw_node_features()
         self.generate_edges()
 
-    def generate_data(self, tasks=1):
-        for t in range(tasks):
-            self.timestamps = np.concatenate((self.timestamps, np.full((self.n,), t)))
-            self.evolve()
-        return self.get_data()
-
     def get_per_class_feature_shift_mmd_with_rbf_kernel(self):
         mmd = 0
         n = self.n
-        X = self.X[:n]
+        X = self.x[:n]
         y_0 = self.y[:n]
-        Z = self.X[-n:]
+        Z = self.x[-n:]
         y_1 = self.y[-n:]
         for c in range(self.classes):
             mmd += mmd_max_rbf(X[y_0 == c], Z[y_1 == c], self.dimensions)
@@ -125,8 +130,8 @@ class FeatureCSBM(MultiClassCSBM):
         self.initial_means = self.means
 
     def evolve(self):
-        super().evolve()
         self.update_means()
+        super().evolve()
 
     def update_means(self):
         new_means = np.zeros((self.classes, self.dimensions))
@@ -186,7 +191,7 @@ class StructureCSBM(MultiClassCSBM):
                          dimensions)
 
     def generate_edges(self):
-        end = len(self.X)
+        end = len(self.x)
         start = end - self.n
         for i in range(start, end):
             for j in range(end):
@@ -212,16 +217,16 @@ class ClassCSBM(MultiClassCSBM):
             yield 4
             yield 3
             yield 2
-            yield 1
-            yield 1
+            while True:
+                yield 1
 
         self.imbalance_ratios = rho_iter()
         super().__init__(n, self.get_class_distribution(classes), means, q_hom, q_het, sigma_square, classes,
                          dimensions)
 
     def evolve(self):
-        super().evolve()
         self.p = self.get_class_distribution(self.classes)
+        super().evolve()
 
     def get_class_distribution(self, c):
         rho = next(self.imbalance_ratios)
@@ -240,9 +245,9 @@ class HomophilyCSBM(MultiClassCSBM):
         super().__init__(n, class_distribution, means, q_hom, q_het, sigma_square, classes, dimensions)
 
     def generate_edges(self):
-        end = len(self.X)
+        end = len(self.x)
         start = end - self.n
-        t = len(self.X) // self.n
+        t = len(self.x) // self.n
         q_hom = self.q_hom / t ** 2
         q_het = self.q_het / t
         for i in range(start, end):

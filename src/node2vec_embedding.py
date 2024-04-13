@@ -4,34 +4,36 @@ import torch
 from torch_geometric.nn import Node2Vec
 
 
-def max_node2vec_embedding(data, n):
+def get_node2vec_model(data, p, q):
+    return Node2Vec(
+        data.edge_index,
+        embedding_dim=128,
+        walk_length=80,
+        context_size=10,
+        walks_per_node=10,
+        num_negative_samples=1,
+        p=p,
+        q=q
+    )
+
+
+def max_range_node2vec_embedding(data):
     parameters = [0.25, 0.5, 1, 2, 4]
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     max_acc = -1
     embedding = None
+    num_workers = 4 if sys.platform == 'linux' else 0
     for p1 in parameters:
         for q1 in parameters:
-            model = Node2Vec(
-                data.edge_index,
-                embedding_dim=128,
-                walk_length=80,
-                context_size=10,
-                walks_per_node=10,
-                num_negative_samples=1,
-                p=p1,
-                q=q1).to(device)
-
-            num_workers = 4 if sys.platform == 'linux' else 0
+            model = get_node2vec_model(data, p1, q1).to(device)
             loader = model.loader(batch_size=32, shuffle=True, num_workers=num_workers)
             optimizer = torch.optim.Adam(list(model.parameters()), lr=0.01)
 
-            N = len(data.x)
+            n = len(data.x)
             train_mask = torch.zeros(n, dtype=torch.bool)
-            train_mask[:int(0.5 * n)] = 1
-            train_mask = train_mask.repeat(N // n)
+            train_mask[torch.arange(n) % 2 == 0] = True
             test_mask = torch.zeros(n, dtype=torch.bool)
-            test_mask[-int(0.5 * n):] = 1
-            test_mask = test_mask.repeat(N // n)
+            test_mask[torch.arange(n) % 2 == 1] = True
 
             def train():
                 model.train()
@@ -48,17 +50,17 @@ def max_node2vec_embedding(data, n):
             def test():
                 model.eval()
                 z = model()
-                acc = model.test(
+                accuracy = model.test(
                     train_z=z[train_mask],
                     train_y=data.y[train_mask],
                     test_z=z[test_mask],
                     test_y=data.y[test_mask],
                     max_iter=150,
                 )
-                return acc
+                return accuracy
 
             curr_acc = -1
-            for epoch in range(100):
+            for epoch in range(150):
                 train()
                 acc = test()
                 curr_acc = max(curr_acc, acc)

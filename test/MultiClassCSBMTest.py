@@ -1,6 +1,8 @@
 import math
 import unittest
+import torch
 from numpy import linalg
+
 from src.csbm import MultiClassCSBM
 
 
@@ -19,19 +21,25 @@ class MultiClassCSBMTest(unittest.TestCase):
                                   round(math.sqrt(2), 6))
 
     def test_number_of_nodes(self):
-        self.assertEquals(self.csbm.data.num_nodes, 5000)
+        self.assertEquals(self.csbm.get_data().num_nodes, 5000)
 
     def test_number_of_node_features(self):
-        self.assertEquals(self.csbm.data.num_node_features, 128)
+        self.assertEquals(self.csbm.get_data().num_node_features, 128)
 
     def test_self_loops(self):
-        self.assertFalse(self.csbm.data.has_self_loops())
+        self.assertFalse(self.csbm.get_data().has_self_loops())
 
     def test_is_directed(self):
-        self.assertTrue(self.csbm.data.is_directed())
+        self.assertTrue(self.csbm.get_data().is_directed())
 
     def test_no_edges_from_old_to_new_nodes(self):
         evolving_csbm = MultiClassCSBM(n=100, classes=10, dimensions=20)
         evolving_csbm.evolve()
         for u, v in zip(evolving_csbm.edge_sources, evolving_csbm.edge_targets):
             self.assertFalse(u < 100 <= v)
+
+    def test_non_overlapping_masks(self):
+        data = self.csbm.get_data()
+        self.assertFalse(torch.logical_and(data.train_mask, data.val_mask).any())
+        self.assertFalse(torch.logical_and(data.train_mask, data.test_mask).any())
+        self.assertFalse(torch.logical_and(data.val_mask, data.test_mask).any())
