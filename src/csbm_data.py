@@ -15,7 +15,7 @@ from csbm import MultiClassCSBM, FeatureCSBM, StructureCSBM, ClassCSBM, Homophil
 # In[2]:
 
 
-n = 50
+n = 5000
 
 os.makedirs('./data/csbm/', exist_ok=True)
 

@@ -17,10 +17,10 @@ def get_node2vec_model(data, p, q):
     )
 
 
-def max_range_node2vec_embedding(data):
+def get_node2vec_embedding(data):
     parameters = [0.25, 0.5, 1, 2, 4]
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    max_acc = -1
+    max_acc = 0
     embedding = None
     num_workers = 4 if sys.platform == 'linux' else 0
     for p1 in parameters:
@@ -59,7 +59,7 @@ def max_range_node2vec_embedding(data):
                 )
                 return accuracy
 
-            curr_acc = -1
+            curr_acc = 0
             for epoch in range(150):
                 train()
                 acc = test()
