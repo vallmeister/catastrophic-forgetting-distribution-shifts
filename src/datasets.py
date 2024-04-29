@@ -5,19 +5,18 @@ import numpy as np
 import torch
 import torch_geometric
 from ogb.nodeproppred import PygNodePropPredDataset
-from sklearn.model_selection import train_test_split
 from torch_geometric.data import Data
 from torch_geometric.datasets import EllipticBitcoinDataset, EllipticBitcoinTemporalDataset
 
 
 def get_dblp():
-    path = Path('./data/dblp-hard/')
+    path = Path('./data/dblp-hard')
 
-    x = np.load(f'{path}/x.npy')
+    x = np.load(f'{path}/X.npy')
     y = np.load(f'{path}/y.npy')
     node_year = np.load(f'{path}/t.npy')
-
     nx_graph = nx.read_adjlist(f'{path}/adjlist.txt', nodetype=int)
+
     data = torch_geometric.utils.from_networkx(nx_graph)
     data.x = torch.tensor(x)
     data.y = torch.tensor(y)
@@ -44,10 +43,13 @@ def get_dblp_tasks():
         class_mask |= (dblp.y == c)
     for year in range(2004, 2016):
         year_mask = (dblp.node_year <= year).squeeze()
-        edge_index = torch_geometric.utils.subgraph(year_mask, dblp.edge_index)[0]
-        train_mask, val_mask, test_mask = get_mask(year_mask & class_mask, seed=0)
-        data_list.append(Data(x=dblp.x, y=dblp.y.squeeze(), node_year=dblp.node_year, edge_index=edge_index,
-                              train_mask=train_mask, val_mask=val_mask, test_mask=test_mask))
+        subgraph = dblp.subgraph(year_mask)
+        node_mask = (dblp.node_year <= year).squeeze() if year == 2004 else (dblp.node_year == year).squeeze()
+        train, val, test = get_mask(node_mask & class_mask, seed=0)
+        subgraph.train_mask = train
+        subgraph.val_mask = val
+        subgraph.test_mask = test
+        data_list.append(subgraph)
     return data_list
 
 
@@ -76,7 +78,7 @@ def get_elliptic_temporal_tasks():
     data_list = []
 
     x = torch.empty([0, 165])
-    y = torch.empty([0])
+    y = torch.empty([0], dtype=torch.long)
     edges = torch.empty([2, 0], dtype=torch.long)
     t = torch.empty([0])
 
@@ -122,11 +124,15 @@ def get_ogbn_arxiv_tasks():
     ogbn = get_ogbn_arxiv()
     data_list = []
     for year in range(2011, 2021):
-        mask = (ogbn.node_year <= year).squeeze()
-        edge_index = torch_geometric.utils.subgraph(mask, ogbn.edge_index)[0]
-        train, val, test = get_mask(mask, seed=0)
-        data_list.append(Data(x=ogbn.x, y=ogbn.y.squeeze(), node_year=ogbn.node_year, edge_index=edge_index,
-                              train_mask=train, val_mask=val, test_mask=test))
+        node_mask = (ogbn.node_year <= year).squeeze()
+        subgraph = ogbn.data.subgraph(node_mask)
+        subgraph.y = subgraph.y.squeeze()
+        year_mask = (subgraph.node_year <= year).squeeze() if year == 2011 else (subgraph.node_year == year).squeeze()
+        train, val, test = get_mask(year_mask, 0.6, 0, 0.4, seed=0)
+        subgraph.train_mask = train
+        subgraph.val_mask = val
+        subgraph.test_mask = test
+        data_list.append(subgraph)
     return data_list
 
 
@@ -135,16 +141,21 @@ def get_mask(mask, train=0.8, val=0.1, test=0.1, seed=None):
         raise ValueError("Split must sum to 1")
 
     indices = torch.where(mask)[0]
-    train_indices, other = train_test_split(indices, train_size=train, test_size=(val + test), random_state=seed)
-    val_indices, test_indices = train_test_split(other, train_size=val / (val + test), test_size=test / (val + test),
-                                                 random_state=seed)
+    n = len(indices)
+    if seed:
+        torch.manual_seed(seed)
+    permuted_indices = torch.randperm(n)
+
+    train_size = int(train * n)
+    val_size = int(val * n)
+    test_size = int(test * n)
 
     train_mask = torch.zeros_like(mask, dtype=torch.bool)
     val_mask = torch.zeros_like(mask, dtype=torch.bool)
     test_mask = torch.zeros_like(mask, dtype=torch.bool)
 
-    train_mask[train_indices] = True
-    val_mask[val_indices] = True
-    test_mask[test_indices] = True
+    train_mask[indices[permuted_indices[:train_size]]] = True
+    val_mask[indices[permuted_indices[train_size:train_size + val_size]]] = True
+    test_mask[indices[permuted_indices[-test_size:]]] = True
 
     return train_mask, val_mask, test_mask

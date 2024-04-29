@@ -48,7 +48,7 @@ class Result:
     def train_model(self, i):
         data = self.data_list[i].to(self.device)
         self.model.train()
-        for epoch in range(200):
+        for epoch in range(300):
             self.optimizer.zero_grad()
             out = self.model(data)
             loss = F.nll_loss(out[data.train_mask], data.y[data.train_mask])

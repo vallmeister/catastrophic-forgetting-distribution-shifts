@@ -7,7 +7,7 @@ from src.csbm import MultiClassCSBM
 
 
 class MultiClassCSBMTest(unittest.TestCase):
-    csbm = MultiClassCSBM()
+    csbm = MultiClassCSBM(n=5000)
 
     def test_means_are_unit_vectors(self):
         for mean in self.csbm.means:
@@ -38,8 +38,9 @@ class MultiClassCSBMTest(unittest.TestCase):
         for u, v in zip(evolving_csbm.edge_sources, evolving_csbm.edge_targets):
             self.assertFalse(u < 100 <= v)
 
-    def test_non_overlapping_masks(self):
+    def test_masks(self):
         data = self.csbm.get_data()
         self.assertFalse(torch.logical_and(data.train_mask, data.val_mask).any())
         self.assertFalse(torch.logical_and(data.train_mask, data.test_mask).any())
         self.assertFalse(torch.logical_and(data.val_mask, data.test_mask).any())
+        self.assertTrue(torch.logical_or(data.train_mask, torch.logical_or(data.val_mask, data.test_mask)).all())

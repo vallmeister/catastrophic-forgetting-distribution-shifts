@@ -46,3 +46,21 @@ class DatasetTest(unittest.TestCase):
     def test_ogbn_list(self):
         ogbn_tasks = ds.get_ogbn_arxiv_tasks()
         self.assertEqual(len(ogbn_tasks), 10)
+
+        for i in range(10):
+            for j in range(i + 1, 10):
+                train_i, train_j = ogbn_tasks[i].train_mask, ogbn_tasks[j].train_mask
+                val_i, val_j = ogbn_tasks[i].val_mask, ogbn_tasks[j].val_mask
+                test_i, test_j = ogbn_tasks[i].test_mask, ogbn_tasks[j].test_mask
+
+                self.assertFalse(torch.logical_and(train_i, val_i).any())
+                self.assertFalse(torch.logical_and(train_i, test_i).any())
+                self.assertFalse(torch.logical_and(val_i, test_i).any())
+
+                self.assertFalse(torch.logical_and(train_i, train_j).any())
+                self.assertFalse(torch.logical_and(val_i, val_j).any())
+                self.assertFalse(torch.logical_and(test_i, test_j).any())
+
+    def test_dblp_list(self):
+        dblp_tasks = ds.get_dblp_tasks()
+        self.assertEqual(len(dblp_tasks), 12)
