@@ -31,7 +31,6 @@ class MultiClassCSBM:
         self.draw_node_features()
         prev = datetime.datetime.now()
         self.generate_edges()
-        print('edges generated', datetime.datetime.now() - prev)
 
     def initialize_means(self):
         means = np.zeros((self.classes, self.dimensions))
@@ -46,13 +45,10 @@ class MultiClassCSBM:
         return means
 
     def draw_class_labels(self):
-        prev = datetime.datetime.now()
         new_labels = torch.tensor(np.random.choice(list(range(self.classes)), self.n, p=self.p), dtype=torch.long)
         self.y = torch.concatenate((self.y, new_labels), dim=0)
-        print(f'Class labels drawn after {datetime.datetime.now() - prev}')
 
     def draw_node_features(self):
-        prev = datetime.datetime.now()
         t = len(self.x) // self.n
         curr_t = torch.full((self.n,), t)
         self.t = torch.concatenate((self.t, curr_t), dim=0)
@@ -65,13 +61,10 @@ class MultiClassCSBM:
             class_mean = self.means[class_label]
             node_features[i - offset] = np.random.multivariate_normal(class_mean, cov, 1)
         self.x = np.concatenate((self.x, node_features))
-        print(f'Node features generated after {datetime.datetime.now() - prev}')
 
     def generate_edges(self):
-        prev = datetime.datetime.now()
         end = len(self.x)
         start = end - self.n
-        print(f'start: {start}\tend: {end}')
         t = len(self.x) // self.n
         q_hom = self.q_hom / t
         q_het = self.q_het / t
@@ -80,13 +73,12 @@ class MultiClassCSBM:
                 if i == j:
                     continue
                 self.set_edge(i, j, q_hom, q_het)
-        print(f'Edges generated after {datetime.datetime.now() - prev}')
 
     def set_edge(self, u, v, p, q):
-        if self.y[u] == self.y[v] and np.random.binomial(1, p):
+        if self.y[u].item() == self.y[v].item() and np.random.binomial(1, p):
             self.edge_sources.append(u)
             self.edge_targets.append(v)
-        elif self.y[u] != self.y[v] and np.random.binomial(1, q):
+        elif self.y[u].item() != self.y[v].item() and np.random.binomial(1, q):
             self.edge_sources.append(u)
             self.edge_targets.append(v)
 

@@ -3,24 +3,22 @@
 
 # # Testing basic GCN on our modified real-world tasks
 
-# In[4]:
+# In[12]:
 
 
 import torch
 import torch_geometric
 
-from datasets import get_dblp_tasks, get_elliptic_temporal_tasks, get_ogbn_arxiv_tasks
+
+# In[2]:
 
 
-# In[ ]:
+dblp = torch.load('./data/real-world/dblp_tasks.pt')
+elliptic = torch.load('./data/real-world/elliptic_tasks.pt')
+ogbn = torch.load('./data/real-world/ogbn_tasks.pt')
 
 
-dblp = get_dblp_tasks()
-elliptic = get_elliptic_temporal_tasks()
-ogbn = get_ogbn_arxiv_tasks()
-
-
-# In[5]:
+# In[3]:
 
 
 import torch.nn.functional as F
@@ -44,27 +42,35 @@ class GCN(torch.nn.Module):
         return F.log_softmax(x, dim=1)
 
 
-# In[6]:
+# In[4]:
 
 
 from measures import Result
+from datasets import get_mask
 
 
-# In[ ]:
+# In[5]:
 
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(device)
+torch.set_printoptions(precision=3)
 
 dblp_result = Result(dblp, GCN(len(dblp[0].x[0]), 44), device)
 dblp_result.learn()
-print(f'DBLP\tAP:{dblp_result.get_average_accuracy():.2f}\tAF:{dblp_result.get_average_forgetting_measure():.2f}\n')
+print(20 * '-')
+print(f'DBLP\tAP:{dblp_result.get_average_accuracy():.3f}\tAF:{dblp_result.get_average_forgetting_measure():.3f}\n')
 print(dblp_result.get_result_matrix())
 
+print(20 * '-')
 elliptic_result = Result(elliptic, GCN(len(elliptic[0].x[0]), 2), device)
 elliptic_result.learn()
-print(f'Elliptic\tAP:{elliptic_result.get_average_accuracy():.2f}\tAF:{elliptic_result.get_average_forgetting_measure():.2f}\n')
+print(f'Elliptic\tAP:{elliptic_result.get_average_accuracy():.3f}\tAF:{elliptic_result.get_average_forgetting_measure():.3f}\n')
 print(elliptic_result.get_result_matrix())
 
-ogbn_result = Result(ogbn, GCN(len(ogbn[0].x[0]), torch.unique(ogbn[0].y)), device)
+print(20 * '-')
+ogbn_result = Result(ogbn, GCN(len(ogbn[0].x[0]), len(torch.unique(ogbn[0].y))), device)
+ogbn_result.learn()
+print(f'OGBN-arXiv\tAP:{ogbn_result.get_average_accuracy():.3f}\tAF:{ogbn_result.get_average_forgetting_measure():.3f}\n')
+print(ogbn_result.get_result_matrix())
 
