@@ -62,14 +62,16 @@ def get_ogbn_class_shift():
 
 if __name__ == "__main__":
     os.makedirs('./class_shifts/', exist_ok=True)
-    file_exists = os.path.exists('./class_shifts/rw_class_shift.csv')
-    with open('./class_shifts/rw_class_shift.csv', 'a', newline='') as file:
-        fieldnames = ['dataset', 'avg_shift', 'max_shift']
+    file_path = './class_shifts/rw_class_shift.csv'
+    fieldnames = ['dataset', 'avg_shift', 'max_shift']
+    if not os.path.exists(file_path):
+        with open(file_path, 'w', newline='') as file:
+            csv.DictWriter(file, fieldnames=fieldnames).writeheader()
+
+    df = pd.read_csv(file_path)
+    with open(file_path, 'a', newline='') as file:
         writer = csv.DictWriter(file, fieldnames=fieldnames)
-        if not file_exists:
-            writer.writeheader()
         for dataset in ['dblp', 'elliptic', 'ogbn']:
-            df = pd.read_csv('./class_shifts/rw_class_shift.csv')
             if (df['dataset'] == dataset).any():
                 continue
             elif dataset == 'dblp':
@@ -81,6 +83,6 @@ if __name__ == "__main__":
             np.save(f'class_shifts/{dataset}.npy', class_shift)
             writer.writerow({'dataset': dataset, 'avg_shift': sum(class_shift) / max(1, len(class_shift)),
                              'max_shift': max(class_shift)})
-        df = pd.read_csv('./class_shifts/rw_class_shift.csv').round(2)
-        print('Class shift')
-        print(df.to_string(index=False))
+
+    df = pd.read_csv(file_path).round(2)
+    print(f'Class shift:\n{df.to_string(index=False)}\n')

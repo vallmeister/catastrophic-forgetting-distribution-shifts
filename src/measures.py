@@ -15,10 +15,10 @@ def mmd_linear(X, Z):
 
 
 def mmd_rbf(X, Z, gamma=1.0):
-    XX = metrics.pairwise.rbf_kernel(X, X, gamma)
-    ZZ = metrics.pairwise.rbf_kernel(Z, Z, gamma)
-    XZ = metrics.pairwise.rbf_kernel(X, Z, gamma)
-    return XX.mean() + ZZ.mean() - 2 * XZ.mean()
+    XX = metrics.pairwise.rbf_kernel(X, X, gamma).mean()
+    ZZ = metrics.pairwise.rbf_kernel(Z, Z, gamma).mean()
+    XZ = metrics.pairwise.rbf_kernel(X, Z, gamma).mean()
+    return XX + ZZ - 2 * XZ
 
 
 def mmd_max_rbf(X, Z, d=128):
