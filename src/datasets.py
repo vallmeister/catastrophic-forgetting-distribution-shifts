@@ -80,7 +80,7 @@ def get_elliptic_temporal_tasks():
     x = torch.empty([0, 165])
     y = torch.empty([0], dtype=torch.long)
     edges = torch.empty([2, 0], dtype=torch.long)
-    t = torch.empty([0])
+    t = torch.empty([0], dtype=torch.long)
 
     def append_snapshot(time):
         elliptic_temp = get_elliptic_temporal(time)

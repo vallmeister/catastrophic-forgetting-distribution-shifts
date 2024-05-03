@@ -1,80 +1,72 @@
 import csv
-import threading
+import os.path
 
+import numpy as np
+import pandas as pd
 import torch
 
 from measures import mmd_max_rbf
 from node2vec_embedding import get_node2vec_embedding
 
-PARAMETERS = [0.25, 0.5, 1, 2, 4]
-RESULTS = {}
 
-
-def dblp_structure_shift_instance(dblp, p, q):
+def get_dblp_structure_shift(p1, q1):
+    dblp = torch.load('./data/real_world/dblp.pt')
     shift = []
-    embedding = get_node2vec_embedding(dblp, p, q)
+    embedding = get_node2vec_embedding(dblp, p1, q1)
     x = embedding[(dblp.node_year <= 2004).squeeze()]
     for year in range(2004, 2016):
         mask = (dblp.node_year <= year).squeeze() if year == 2004 else (dblp.node_year == year).squeeze()
         z = embedding[mask]
         shift.append(mmd_max_rbf(x, z))
-    torch.save(f'./rw_structure/dblp_{str(p).replace(".", "")}_{str(q).replace(".", "")}.pt',
-               torch.tensor(shift))
-    RESULTS[('ogbn', p, q)] = shift
+    return shift
 
 
-def dblp_structure_shift():
-    dblp = torch.load('./data/real_world/dblp_tasks.pt')[-1]
-    threads = []
-    for p in PARAMETERS:
-        for q in PARAMETERS:
-            t = threading.Thread(target=dblp_structure_shift_instance, args=(dblp, p, q))
-            threads.append(t)
-            t.start()
-    for t in threads:
-        t.join()
-
-
-def ogbn_structure_shift_instance(ogbn, p, q):
+def get_elliptic_structure_shift(p1, q1):
+    elliptic = torch.load('./data/real_world/elliptic_tasks.pt')
     shift = []
-    embedding = get_node2vec_embedding(ogbn, p, q)
+    embedding = get_node2vec_embedding(elliptic, p1, q1)
+    x = embedding[elliptic.t == 0]
+    for task in range(10):
+        z = embedding[elliptic.t == task]
+        shift.append(mmd_max_rbf(x, z))
+    return shift
+
+
+def get_ogbn_structure_shift(p1, q1):
+    ogbn = torch.load('./data/real_world/ogbn.pt')
+    shift = []
+    embedding = get_node2vec_embedding(ogbn, p1, q1)
     x = embedding[(ogbn.node_year <= 2011).squeeze()]
     for year in range(2011, 2021):
         mask = (ogbn.node_year <= year).squeeze() if year == 2011 else (ogbn.node_year == year).squeeze()
         z = embedding[mask]
         shift.append(mmd_max_rbf(x, z))
-    torch.save(f'./rw_structure/ogbn_{str(p).replace(".", "")}_{str(q).replace(".", "")}.pt',
-               torch.tensor(shift))
-    RESULTS[('ogbn', p, q)] = shift
-
-
-def ogbn_structure_shift():
-    ogbn = torch.load('./data/real_world/ogbn_tasks.pt')
-    threads = []
-    for p in PARAMETERS:
-        for q in PARAMETERS:
-            t = threading.Thread(target=ogbn_structure_shift_instance, args=(ogbn, p, q))
-            threads.append(t)
-            t.start()
-    for t in threads:
-        t.join()
+    return shift
 
 
 if __name__ == "__main__":
-    t1 = threading.Thread(target=dblp_structure_shift)
-    t2 = threading.Thread(target=ogbn_structure_shift)
-
-    t1.start()
-    t2.start()
-
-    t1.join()
-    t2.join()
-
-    with open('rw_structure_shift.csv', 'w') as csv_file:
-        fieldnames = ['Dataset', 'p', 'q', 'avg_shift', 'max_shift']
+    parameters = [0.25, 0.5, 1, 2, 4]
+    os.makedirs('./structure_shifts/', exist_ok=True)
+    file_exists = os.path.exists('rw_structure_shift.csv')
+    with open('rw_structure_shift.csv', 'a', newline='') as csv_file:
+        fieldnames = ['dataset', 'p', 'q', 'avg_shift', 'max_shift']
         writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
-        writer.writeheader()
-        for k, shift_list in RESULTS.items():
-            dataset, p, q = k
-            writer.writerow({'Dataset': dataset, 'p': p, 'q': q, 'avg_shift': sum(shift_list) / len(shift_list),
-                             'max_shift': max(shift_list)})
+        if not file_exists:
+            writer.writeheader()
+        for dataset in {'dblp', 'elliptic', 'ogbn'}:
+            for p in parameters:
+                for q in parameters:
+                    df = pd.read_csv('rw_structure_shift.csv')
+                    if ((df['dataset'] == dataset) & (df['p'] == p) & (df['q'] == q)).any():
+                        continue
+                    elif dataset == 'dblp':
+                        structure_shift = get_dblp_structure_shift(p, q)
+                    elif dataset == 'elliptic':
+                        structure_shift = get_elliptic_structure_shift(p, q)
+                    elif dataset == 'ogbn':
+                        structure_shift = get_ogbn_structure_shift(p, q)
+                    np.save(f'./structure_shifts/{dataset}_{str(p).replace(".", "")}_{str(q).replace(".", "")}.npy',
+                            structure_shift)
+                    writer.writerow(
+                        {'dataset': dataset, 'p': p, 'q': q, 'avg_shift': sum(structure_shift) / len(structure_shift),
+                         'max_shift': max(structure_shift)})

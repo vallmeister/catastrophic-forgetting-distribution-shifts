@@ -1,3 +1,5 @@
+from collections import defaultdict
+
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -29,9 +31,11 @@ def mmd_max_rbf(X, Z, d=128):
     return max_mmd
 
 
-def total_variation_distance(P, Q):
-    c = len(P)
-    return 0.5 * round(sum(abs(P[k] - Q[k]) for k in range(c)), 4)
+def total_variation_distance(p, q):
+    p = defaultdict(float, p)
+    q = defaultdict(float, q)
+    keys = p.keys() | q.keys()
+    return 0.5 * round(sum(abs(p[k] - q[k]) for k in keys), 6)
 
 
 class Result:
