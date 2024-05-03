@@ -29,7 +29,6 @@ class MultiClassCSBM:
 
         self.draw_class_labels()
         self.draw_node_features()
-        prev = datetime.datetime.now()
         self.generate_edges()
 
     def initialize_means(self):
@@ -105,9 +104,6 @@ class MultiClassCSBM:
         for c in range(self.classes):
             mmd += mmd_max_rbf(X[y_0 == c], Z[y_1 == c], self.dimensions)
         return mmd / self.classes
-
-    def get_structure_shift_rbf_mmd(self):
-        pass
 
     def get_class_label_shift_tvd(self):
         y_0 = self.y[:self.n]
