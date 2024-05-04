@@ -46,17 +46,20 @@ def get_ogbn_structure_shift(p1, q1):
 
 if __name__ == "__main__":
     parameters = [0.25, 0.5, 1, 2, 4]
+    fieldnames = ['dataset', 'p', 'q', 'avg_shift', 'max_shift']
+
     os.makedirs('./structure_shifts/', exist_ok=True)
-    file_exists = os.path.exists('rw_structure_shift.csv')
-    with open('rw_structure_shift.csv', 'a', newline='') as csv_file:
-        fieldnames = ['dataset', 'p', 'q', 'avg_shift', 'max_shift']
-        writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
-        if not file_exists:
-            writer.writeheader()
-        for dataset in {'dblp', 'elliptic', 'ogbn'}:
+    file_path = './structure_shifts/rw_structure_shift.csv'
+    if not os.path.exists('rw_structure_shift.csv'):
+        with open(file_path, 'w', newline='') as file:
+            csv.DictWriter(file, fieldnames=fieldnames).writeheader()
+
+    df = pd.read_csv(file_path)
+    with open(file_path, 'a', newline='') as file:
+        writer = csv.DictWriter(file, fieldnames=fieldnames)
+        for dataset in ['dblp', 'elliptic', 'ogbn']:
             for p in parameters:
                 for q in parameters:
-                    df = pd.read_csv('rw_structure_shift.csv')
                     if ((df['dataset'] == dataset) & (df['p'] == p) & (df['q'] == q)).any():
                         continue
                     elif dataset == 'dblp':
@@ -70,3 +73,5 @@ if __name__ == "__main__":
                     writer.writerow(
                         {'dataset': dataset, 'p': p, 'q': q, 'avg_shift': sum(structure_shift) / len(structure_shift),
                          'max_shift': max(structure_shift)})
+    df = pd.read_csv(file_path)
+    print(f'Structure shift:\n{df.to_string(index=False)}')

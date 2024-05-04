@@ -16,12 +16,15 @@ def get_dblp_feature_shift():
     for year in range(2004, 2016):
         year_mask = dblp.node_year <= year if year == 2004 else dblp.node_year == year
         mmd = 0
+        class_count = 0
         for c in observed_classes:
             class_mask = dblp.y == c
             x = dblp.x[mask & class_mask]
             z = dblp.x[year_mask & class_mask]
-            mmd += mmd_max_rbf(x, z, len(x[0]))
-        feature_shift.append(mmd / len(observed_classes))
+            if x.numel() > 0 and z.numel() > 0:
+                mmd += mmd_max_rbf(x, z, len(x[0]))
+                class_count += 1
+        feature_shift.append(mmd / class_count)
     return feature_shift
 
 
@@ -64,10 +67,10 @@ if __name__ == "__main__":
         with open(file_path, 'w', newline='') as file:
             csv.DictWriter(file, fieldnames=fieldnames).writeheader()
 
+    df = pd.read_csv(file_path)
     with open(file_path, 'a', newline='') as file:
         writer = csv.DictWriter(file, fieldnames=fieldnames)
         for dataset in ['dblp', 'elliptic', 'ogbn']:
-            df = pd.read_csv(file_path)
             if (df['dataset'] == dataset).any():
                 continue
             elif dataset == 'dblp':

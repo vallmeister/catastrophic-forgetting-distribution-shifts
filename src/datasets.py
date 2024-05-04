@@ -18,9 +18,9 @@ def get_dblp():
     nx_graph = nx.read_adjlist(f'{path}/adjlist.txt', nodetype=int)
 
     data = torch_geometric.utils.from_networkx(nx_graph)
-    data.x = torch.tensor(x)
-    data.y = torch.tensor(y)
-    data.node_year = torch.tensor(node_year)
+    data.x = torch.tensor(x, dtype=torch.float)
+    data.y = torch.tensor(y, dtype=torch.long)
+    data.node_year = torch.tensor(node_year, dtype=torch.long)
 
     return data
 

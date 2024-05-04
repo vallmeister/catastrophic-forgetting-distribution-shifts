@@ -7,13 +7,13 @@
 
 
 import torch
-import torch_geometric
 
+import datasets
 
 # In[2]:
 
 
-dblp = torch.load('./data/real-world/dblp_tasks.pt')
+dblp = datasets.get_dblp_tasks()
 elliptic = torch.load('./data/real-world/elliptic_tasks.pt')
 ogbn = torch.load('./data/real-world/ogbn_tasks.pt')
 
@@ -33,6 +33,7 @@ class GCN(torch.nn.Module):
 
     def forward(self, data):
         x, edge_index = data.x, data.edge_index
+        print(f'X: {x.dtype}\tWeight:{self.weight.dtype}')
 
         x = self.conv1(x, edge_index)
         x = F.relu(x)
@@ -46,8 +47,6 @@ class GCN(torch.nn.Module):
 
 
 from measures import Result
-from datasets import get_mask
-
 
 # In[5]:
 
