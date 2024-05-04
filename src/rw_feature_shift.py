@@ -79,7 +79,7 @@ if __name__ == "__main__":
                 shift = get_elliptic_feature_shift()
             elif dataset == 'ogbn':
                 shift = get_ogbn_feature_shift()
-            np.save(f'./feature_shifts/{dataset}.npy')
+            np.save(f'./feature_shifts/{dataset}.npy', shift)
             writer.writerow({'dataset': dataset, 'avg_shift': sum(shift) / max(1, len(shift)), 'max_shift': max(shift)})
 
     df = pd.read_csv(file_path).round(2)

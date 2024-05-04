@@ -14,8 +14,8 @@ import datasets
 
 
 dblp = datasets.get_dblp_tasks()
-elliptic = torch.load('./data/real-world/elliptic_tasks.pt')
-ogbn = torch.load('./data/real-world/ogbn_tasks.pt')
+elliptic = torch.load('./data/real_world/elliptic_tasks.pt')
+ogbn = torch.load('./data/real_world/ogbn_tasks.pt')
 
 
 # In[3]:

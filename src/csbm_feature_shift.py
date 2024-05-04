@@ -37,7 +37,6 @@ if __name__ == "__main__":
         for dataset in csbm_names:
             for i in range(10):
                 name = f'{dataset}_{i:02d}'
-                print(name)
                 if (df['dataset'] == name).any():
                     continue
                 csbm = torch.load(f'./data/csbm/{name}.pt')[-1]
@@ -45,5 +44,5 @@ if __name__ == "__main__":
                 np.save(f'./feature_shifts/{name}.npy', shift)
                 writer.writerow(
                     {'dataset': name, 'avg_shift': sum(shift) / max(1, len(shift)), 'max_shift': max(shift)})
-    df = pd.read_csv(file_path).round(3)
+    df = pd.read_csv(file_path).round(4)
     print(f'Feature shift:\n{df.to_string(index=False)}\n')
