@@ -1,22 +1,21 @@
+import numpy as np
 import torch
 import torch.nn.functional as F
 from torch_geometric.nn import GCNConv
 
+from measures import Result
+
 
 class NET(torch.nn.Module):
     def __init__(self,
-                 model,
-                 task_manager,
-                 args):
+                 model):
         super(NET, self).__init__()
-
-        self.task_manager = task_manager
 
         # setup network
         self.net = model
 
         # setup optimizer
-        self.opt = torch.optim.Adam(self.net.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+        self.opt = torch.optim.Adam(self.net.parameters(), lr=0.01, weight_decay=0.001)
 
         # setup losses
         self.ce = torch.nn.CrossEntropyLoss()
@@ -27,31 +26,30 @@ class NET(torch.nn.Module):
         self.fisher_att = {}
         self.optpar = {}
         self.mem_mask = None
+        self.mem_task = None
 
         # hyper-parameters
-        self.lambda_l = args.lambda_l
-        self.lambda_t = args.lambda_t
-        self.beta = args.beta
+        self.lambda_l = 10000
+        self.lambda_t = 100
+        self.beta = 0.1
 
     def forward(self, features):
         output, elist = self.net(features)
         return output
 
-    def observe(self, features, labels, t, train_mask):
+    def observe(self, dataset, t):
         self.net.train()
 
         # if new task
         if t != self.current_task:
             self.net.zero_grad()
-            offset1, offset2 = self.task_manager.get_label_offset(self.current_task)
             self.fisher_loss[self.current_task] = []
             self.fisher_att[self.current_task] = []
             self.optpar[self.current_task] = []
 
             # computing gradient for the previous task
-            output, elist = self.net(features)
-            loss = self.ce((output[self.mem_mask, offset1: offset2]),
-                           labels[self.mem_mask] - offset1)
+            output = self.net(self.mem_task)
+            loss = self.ce((output[self.mem_mask]), self.mem_task.y[self.mem_mask])
             loss.backward(retain_graph=True)
 
             for p in self.net.parameters():
@@ -60,23 +58,22 @@ class NET(torch.nn.Module):
                 self.optpar[self.current_task].append(pd)
                 self.fisher_loss[self.current_task].append(pg)
 
-            eloss = torch.norm(elist[0])
-            eloss.backward()
             for p in self.net.parameters():
                 pg = p.grad.data.clone().pow(2)
                 self.fisher_att[self.current_task].append(pg)
 
             self.current_task = t
             self.mem_mask = None
+            self.mem_task = None
 
         if self.mem_mask is None:
-            self.mem_mask = train_mask.data.clone()
+            self.mem_mask = dataset.train_mask.data.clone()
+        if self.mem_task is None:
+            self.mem_task = dataset.clone()
 
         self.net.zero_grad()
-        offset1, offset2 = self.task_manager.get_label_offset(t)
-        output, elist = self.net(features)
-        loss = self.ce((output[train_mask, offset1: offset2]),
-                       labels[train_mask] - offset1)
+        output = self.net(dataset)
+        loss = self.ce(output[dataset.train_mask], dataset.y[dataset.train_mask])
 
         loss.backward(retain_graph=True)
         grad_norm = 0
@@ -106,7 +103,7 @@ class GCN(torch.nn.Module):
 
         x = self.conv1(x, edge_index)
         x = F.relu(x)
-        x = F.dropout(x, training=self.training, p=0.1)
+        x = F.dropout(x, training=self.training, p=0.2)
         x = self.conv2(x, edge_index)
 
         return F.log_softmax(x, dim=1)
@@ -114,22 +111,37 @@ class GCN(torch.nn.Module):
 
 if __name__ == "__main__":
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = GCN(128, 16).to(device)
+
+    # Plain GCN
+    plain_model = GCN(128, 16)
     print(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=0.001)
+    optimizer = torch.optim.Adam(plain_model.parameters(), lr=0.01, weight_decay=0.001)
 
     data_list = torch.load('./data/csbm/feat_01.pt')
-    data = data_list[0].to(device)
+    plain_result = Result(data_list, plain_model, device)
+    plain_result.learn()
+    print(f'AP: {plain_result.get_average_accuracy():.2f}')
+    print(f'AF: {plain_result.get_average_forgetting_measure():.2f}')
 
-    model.train()
-    for epoch in range(100):
-        optimizer.zero_grad()
-        out = model(data)
-        loss = F.nll_loss(out[data.train_mask], data.y[data.train_mask])
-        loss.backward()
-        optimizer.step()
-    model.eval()
-    pred = model(data).argmax(dim=1)
-    correct = (pred[data.test_mask] == data.y[data.test_mask]).sum()
-    acc = int(correct) / int(data.test_mask.sum())
-    print(f'Accuracy: {acc:.3f}')
+
+    # GCN with TWP regularization module
+    twp_model = GCN(128, 16).to(device)
+    twp = NET(twp_model)
+    accuracy_matrix = torch.empty(10, 10)
+    torch.set_printoptions(precision=3, sci_mode=False)
+    for task_i, dataset_i in enumerate(data_list):
+        dataset_i.to(device)
+        for epoch in range(1, 201):
+            twp.observe(dataset_i, task_i)
+        for t in range(len(data_list)):
+            dataset_t = data_list[t].to(device)
+            test_mask = dataset_t.test_mask
+            twp_model.eval()
+            pred = twp_model(dataset_t).argmax(dim=1)
+            correct = (pred[test_mask] == dataset_t.y[test_mask]).sum()
+            acc = int(correct) / int(test_mask.sum())
+            accuracy_matrix[task_i][t] = acc
+    result = Result(data_list, twp_model, device)
+    result.result_matrix = accuracy_matrix
+    print(f'AP: {result.get_average_accuracy():.2f}')
+    print(f'AF: {result.get_average_forgetting_measure():.2f}')

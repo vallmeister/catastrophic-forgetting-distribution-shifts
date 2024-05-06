@@ -57,9 +57,9 @@ if __name__ == "__main__":
     df = pd.read_csv(file_path)
     with open(file_path, 'a', newline='') as file:
         writer = csv.DictWriter(file, fieldnames=fieldnames)
-        for dataset in ['dblp', 'elliptic', 'ogbn']:
-            for p in node2vec_embedding.PARAMETERS:
-                for q in node2vec_embedding.PARAMETERS:
+        for p in node2vec_embedding.PARAMETERS:
+            for q in node2vec_embedding.PARAMETERS:
+                for dataset in ['dblp', 'elliptic', 'ogbn']:
                     if ((df['dataset'] == dataset) & (df['p'] == p) & (df['q'] == q)).any():
                         continue
                     elif dataset == 'dblp':

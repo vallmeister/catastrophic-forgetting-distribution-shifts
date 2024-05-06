@@ -3,7 +3,7 @@ import sys
 import torch
 from torch_geometric.nn import Node2Vec
 
-PARAMETERS = [0.25, 0.5, 1, 2, 4]
+PARAMETERS = [1, 2, 0.5, 0.25, 4]
 
 
 def get_node2vec_model(data, p, q, length=80, k=10):

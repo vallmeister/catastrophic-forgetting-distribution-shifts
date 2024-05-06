@@ -3,7 +3,6 @@ from collections import defaultdict
 import numpy as np
 import torch
 import torch.nn.functional as F
-
 from sklearn import metrics
 
 
@@ -39,12 +38,13 @@ def total_variation_distance(p, q):
 
 
 class Result:
-    def __init__(self, data_list, gnn, device):
+    def __init__(self, data_list, gnn, device, f1=False):
         self.data_list = data_list
         self.model = gnn.to(device)
         self.device = device
         self.optimizer = torch.optim.Adam(gnn.parameters(), lr=0.01, weight_decay=0.001)
         self.result_matrix = torch.zeros(len(data_list), len(data_list))
+        self.f1 = f1
 
     def get_result_matrix(self):
         return self.result_matrix
@@ -52,21 +52,19 @@ class Result:
     def train_model(self, i):
         data = self.data_list[i].to(self.device)
         self.model.train()
-        for epoch in range(100):
+        for epoch in range(200):
             self.optimizer.zero_grad()
             out = self.model(data)
-            try:
-                loss = F.nll_loss(out[data.train_mask], data.y[data.train_mask])
-                loss.backward()
-                self.optimizer.step()
-            except IndexError as err:
-                print(err)
-                print(f'Error at {i}th task: out is of size {out.size()} and mask is of size {data.train_mask.size()}')
+            loss = F.nll_loss(out[data.train_mask], data.y[data.train_mask])
+            loss.backward()
+            self.optimizer.step()
 
     def test_model(self, i):
         data = self.data_list[i].to(self.device)
         self.model.eval()
         pred = self.model(data).argmax(dim=1)
+        if self.f1:
+            return metrics.f1_score(data.y[data.test_mask], pred[data.test_mask])
         correct = (pred[data.test_mask] == data.y[data.test_mask]).sum()
         return int(correct) / int(data.test_mask.sum())
 

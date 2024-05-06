@@ -59,7 +59,7 @@ print(f'DBLP\tAP:{dblp_result.get_average_accuracy():.3f}\tAF:{dblp_result.get_a
 print(dblp_result.get_result_matrix())
 
 print(20 * '-')
-elliptic_result = Result(elliptic, GCN(len(elliptic[0].x[0]), 2), device)
+elliptic_result = Result(elliptic, GCN(len(elliptic[0].x[0]), 2), device, f1=True)
 elliptic_result.learn()
 print(f'Elliptic\tAP:{elliptic_result.get_average_accuracy():.3f}\tAF:{elliptic_result.get_average_forgetting_measure():.3f}\n')
 print(elliptic_result.get_result_matrix())
