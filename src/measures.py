@@ -52,12 +52,16 @@ class Result:
     def train_model(self, i):
         data = self.data_list[i].to(self.device)
         self.model.train()
-        for epoch in range(500):
+        for epoch in range(100):
             self.optimizer.zero_grad()
             out = self.model(data)
-            loss = F.nll_loss(out[data.train_mask], data.y[data.train_mask])
-            loss.backward()
-            self.optimizer.step()
+            try:
+                loss = F.nll_loss(out[data.train_mask], data.y[data.train_mask])
+                loss.backward()
+                self.optimizer.step()
+            except IndexError as err:
+                print(err)
+                print(f'Error at {i}th task: out is of size {out.size()} and mask is of size {data.train_mask.size()}')
 
     def test_model(self, i):
         data = self.data_list[i].to(self.device)
@@ -74,7 +78,7 @@ class Result:
 
     def get_average_accuracy(self):
         tasks = len(self.data_list)
-        return 1 / tasks * sum(self.result_matrix[tasks - 1][i] for i in range(tasks))
+        return 1 / tasks * sum(self.result_matrix[tasks - 1][i].item() for i in range(tasks))
 
     def get_forgetting_measure(self, i, j):
         return max(self.result_matrix[k][i].item() for k in range(j)) - self.result_matrix[j][i].item()

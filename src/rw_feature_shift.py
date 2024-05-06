@@ -48,14 +48,17 @@ def get_ogbn_feature_shift():
     ogbn = torch.load('./data/real_world/ogbn.pt')
     observed_classes = sorted(torch.unique(ogbn.y).tolist())
     for year in range(2011, 2021):
-        year_mask = ogbn.node_year <= year if year == 2011 else ogbn.node_year == year
+        year_mask = (ogbn.node_year <= year).squeeze() if year == 2011 else (ogbn.node_year == year).squeeze()
         mmd = 0
+        classes = 0
         for c in observed_classes:
-            class_mask = ogbn.y == c
-            x = ogbn.x[(ogbn.node_year <= 2011) & class_mask]
+            class_mask = (ogbn.y == c).squeeze()
+            x = ogbn.x[(ogbn.node_year <= 2011).squeeze() & class_mask]
             z = ogbn.x[year_mask & class_mask]
-            mmd += mmd_max_rbf(x, z, len(x[0]))
-        feature_shift.append(mmd / len(observed_classes))
+            if x.numel() > 0 and z.numel() > 0:
+                mmd += mmd_max_rbf(x, z, len(x[0]))
+                classes += 1
+        feature_shift.append(mmd / classes)
     return feature_shift
 
 
@@ -82,5 +85,5 @@ if __name__ == "__main__":
             np.save(f'./feature_shifts/{dataset}.npy', shift)
             writer.writerow({'dataset': dataset, 'avg_shift': sum(shift) / max(1, len(shift)), 'max_shift': max(shift)})
 
-    df = pd.read_csv(file_path).round(2)
+    df = pd.read_csv(file_path).round(4)
     print(f'Feature shift:\n{df.to_string(index=False)}\n')

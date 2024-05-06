@@ -38,17 +38,28 @@ def get_dblp_tasks():
     """
     data_list = []
     dblp = get_dblp()
-    class_mask = torch.zeros_like(dblp.y).bool()
-    for c in torch.unique(dblp.y[dblp.node_year <= 2004]).tolist():
-        class_mask |= (dblp.y == c)
+
+    observed_classes = sorted(torch.unique(dblp.y[dblp.node_year <= 2004]).tolist())
+    all_classes = torch.unique(dblp.y).tolist()
+    unobserved_classes = list(sorted(set(all_classes) - set(observed_classes)))
+    label_map = {c: i for i, c in enumerate(observed_classes)} | {c: i + len(observed_classes) for i, c in
+                                                                  enumerate(unobserved_classes)}
+    dblp.y.apply_(lambda x: label_map[x])
+
     for year in range(2004, 2016):
         year_mask = (dblp.node_year <= year).squeeze()
         subgraph = dblp.subgraph(year_mask)
-        node_mask = (dblp.node_year <= year).squeeze() if year == 2004 else (dblp.node_year == year).squeeze()
+
+        node_mask = (subgraph.node_year <= year).squeeze() if year == 2004 else (subgraph.node_year == year).squeeze()
+        class_mask = torch.zeros_like(node_mask, dtype=torch.bool)
+        for c in range(len(observed_classes)):
+            class_mask |= (subgraph.y == c).squeeze()
+
         train, val, test = get_mask(node_mask & class_mask, seed=0)
         subgraph.train_mask = train
         subgraph.val_mask = val
         subgraph.test_mask = test
+
         data_list.append(subgraph)
     return data_list
 
@@ -128,7 +139,7 @@ def get_ogbn_arxiv_tasks():
         subgraph = ogbn.data.subgraph(node_mask)
         subgraph.y = subgraph.y.squeeze()
         year_mask = (subgraph.node_year <= year).squeeze() if year == 2011 else (subgraph.node_year == year).squeeze()
-        train, val, test = get_mask(year_mask, 0.6, 0, 0.4, seed=0)
+        train, val, test = get_mask(year_mask, seed=0)
         subgraph.train_mask = train
         subgraph.val_mask = val
         subgraph.test_mask = test

@@ -8,12 +8,10 @@
 
 import torch
 
-import datasets
-
 # In[2]:
 
 
-dblp = datasets.get_dblp_tasks()
+dblp = torch.load('./data/real_world/dblp_tasks.pt')
 elliptic = torch.load('./data/real_world/elliptic_tasks.pt')
 ogbn = torch.load('./data/real_world/ogbn_tasks.pt')
 
@@ -33,7 +31,6 @@ class GCN(torch.nn.Module):
 
     def forward(self, data):
         x, edge_index = data.x, data.edge_index
-        print(f'X: {x.dtype}\tWeight:{self.weight.dtype}')
 
         x = self.conv1(x, edge_index)
         x = F.relu(x)
@@ -55,7 +52,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(device)
 torch.set_printoptions(precision=3)
 
-dblp_result = Result(dblp, GCN(len(dblp[0].x[0]), 44), device)
+dblp_result = Result(dblp, GCN(len(dblp[0].x[0]), len(torch.unique(dblp[0].y))), device)
 dblp_result.learn()
 print(20 * '-')
 print(f'DBLP\tAP:{dblp_result.get_average_accuracy():.3f}\tAF:{dblp_result.get_average_forgetting_measure():.3f}\n')

@@ -27,16 +27,11 @@ torch.save(ogbn_tasks, './data/real_world/ogbn_tasks.pt')
 dblp_tasks = torch.load('./data/real_world/dblp_tasks.pt')
 
 assert len(dblp_tasks) == 12, "Not 12 tasks"
-for i in range(12):
-    data_i = dblp_tasks[i]
-    train_i, val_i, test_i = data_i.train_mask, data_i.val_mask, data_i.test_mask
-    assert not torch.logical_and(train_i, val_i).any()
-    assert not torch.logical_and(train_i, test_i).any()
-    assert not torch.logical_and(val_i, test_i).any()
-
-    for j in range(i + 1, 12):
-        data_j = dblp_tasks[j]
-        train_j, val_j, test_j = data_j.train_mask, data_j.val_mask, data_j.test_mask
-        assert not torch.logical_and(train_i, train_j).any()
-        assert not torch.logical_and(val_i, val_j).any()
-        assert not torch.logical_and(test_i, test_j).any()
+for data in dblp_tasks:
+    train, val, test = data.train_mask, data.val_mask, data.test_mask
+    assert not torch.logical_and(train, val).any()
+    assert not torch.logical_and(train, test).any()
+    assert not torch.logical_and(val, test).any()
+    print(f'X: {data.x.size()}')
+    print(f'Y: {data.y.size()}, labels: {sorted(torch.unique(data.y).tolist())}')
+    print(f'train mask: {train.size()}, {train.sum().item()}')

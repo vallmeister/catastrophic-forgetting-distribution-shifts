@@ -1,13 +1,18 @@
 import csv
 import os
+
 import numpy as np
 import pandas as pd
 import torch
 
+from csbm import split_static_csbm, CSBM_NAMES
 from measures import mmd_max_rbf
 
 
 def get_feature_shift(csbm):
+    if len(torch.unique(csbm.t)) == 1:
+        split_static_csbm(csbm)
+
     feature_shift = []
     for task in range(torch.max(csbm.t).item() + 1):
         t_mask = csbm.t == task
@@ -23,7 +28,6 @@ def get_feature_shift(csbm):
 
 
 if __name__ == "__main__":
-    csbm_names = ['base', 'class', 'feat', 'hom', 'struct', 'zero']
     fieldnames = ['dataset', 'avg_shift', 'max_shift']
     os.makedirs('./feature_shifts/', exist_ok=True)
     file_path = './feature_shifts/csbm_feature_shift.csv'
@@ -34,7 +38,7 @@ if __name__ == "__main__":
     df = pd.read_csv(file_path)
     with open(file_path, 'a', newline='') as file:
         writer = csv.DictWriter(file, fieldnames=fieldnames)
-        for dataset in csbm_names:
+        for dataset in CSBM_NAMES:
             for i in range(10):
                 name = f'{dataset}_{i:02d}'
                 if (df['dataset'] == name).any():

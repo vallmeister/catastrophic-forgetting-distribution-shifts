@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import torch
 
+import node2vec_embedding
 from measures import mmd_max_rbf
 from node2vec_embedding import get_node2vec_embedding
 
@@ -40,17 +41,16 @@ def get_ogbn_structure_shift(p1, q1):
     for year in range(2011, 2021):
         mask = (ogbn.node_year <= year).squeeze() if year == 2011 else (ogbn.node_year == year).squeeze()
         z = embedding[mask]
-        shift.append(mmd_max_rbf(x, z))
+        shift.append(mmd_max_rbf(x, z, len(x[0])))
     return shift
 
 
 if __name__ == "__main__":
-    parameters = [0.25, 0.5, 1, 2, 4]
     fieldnames = ['dataset', 'p', 'q', 'avg_shift', 'max_shift']
 
     os.makedirs('./structure_shifts/', exist_ok=True)
     file_path = './structure_shifts/rw_structure_shift.csv'
-    if not os.path.exists('rw_structure_shift.csv'):
+    if not os.path.exists(file_path):
         with open(file_path, 'w', newline='') as file:
             csv.DictWriter(file, fieldnames=fieldnames).writeheader()
 
@@ -58,8 +58,8 @@ if __name__ == "__main__":
     with open(file_path, 'a', newline='') as file:
         writer = csv.DictWriter(file, fieldnames=fieldnames)
         for dataset in ['dblp', 'elliptic', 'ogbn']:
-            for p in parameters:
-                for q in parameters:
+            for p in node2vec_embedding.PARAMETERS:
+                for q in node2vec_embedding.PARAMETERS:
                     if ((df['dataset'] == dataset) & (df['p'] == p) & (df['q'] == q)).any():
                         continue
                     elif dataset == 'dblp':

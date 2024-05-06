@@ -7,6 +7,8 @@ from torch_geometric.data import Data
 from datasets import get_mask
 from measures import mmd_max_rbf, total_variation_distance
 
+CSBM_NAMES = ['base', 'class', 'feat', 'hom', 'struct', 'zero']
+
 
 class MultiClassCSBM:
     def __init__(self, n=5000, class_distribution=None, means=None, q_hom=0.005, q_het=0.001, sigma_square=0.1,
@@ -23,7 +25,7 @@ class MultiClassCSBM:
 
         self.x = np.empty([0, dimensions], dtype=np.float64)
         self.y = torch.empty(0, dtype=torch.long)
-        self.t = torch.empty(0, dtype=torch.int32)
+        self.t = torch.empty(0, dtype=torch.long)
         self.edge_sources = []
         self.edge_targets = []
 
@@ -82,7 +84,7 @@ class MultiClassCSBM:
             self.edge_targets.append(v)
 
     def get_data(self):
-        edge_index = torch.tensor([self.edge_sources, self.edge_targets], dtype=torch.int32)
+        edge_index = torch.tensor([self.edge_sources, self.edge_targets], dtype=torch.long)
         x = torch.tensor(self.x, dtype=torch.float)
         mask = (self.t == self.t[-1])
         train_mask, val_mask, test_mask = get_mask(mask)
@@ -272,3 +274,13 @@ class HomophilyCSBM(MultiClassCSBM):
                 if i == j:
                     continue
                 self.set_edge(i, j, q_hom, q_het)
+
+
+def split_static_csbm(csbm):
+    torch.manual_seed(0)
+    indices = torch.randperm(len(csbm.t))
+    split_indices = torch.chunk(indices, 10)
+    labels = torch.zeros_like(csbm.t, dtype=torch.long)
+    for i, part in enumerate(split_indices):
+        labels[part] = i
+    csbm.t = labels

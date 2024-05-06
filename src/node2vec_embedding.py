@@ -3,13 +3,15 @@ import sys
 import torch
 from torch_geometric.nn import Node2Vec
 
+PARAMETERS = [0.25, 0.5, 1, 2, 4]
 
-def get_node2vec_model(data, p, q):
+
+def get_node2vec_model(data, p, q, length=80, k=10):
     return Node2Vec(
         data.edge_index,
         embedding_dim=128,
-        walk_length=80,
-        context_size=10,
+        walk_length=length,
+        context_size=k,
         walks_per_node=10,
         num_negative_samples=1,
         p=p,
@@ -17,10 +19,10 @@ def get_node2vec_model(data, p, q):
     )
 
 
-def get_node2vec_embedding(data, p, q):
+def get_node2vec_embedding(data, p, q, length=80, k=10):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     num_workers = 4 if sys.platform == 'linux' else 0
-    model = get_node2vec_model(data, p, q).to(device)
+    model = get_node2vec_model(data, p, q, length, k).to(device)
     loader = model.loader(batch_size=32, shuffle=True, num_workers=num_workers)
     optimizer = torch.optim.Adam(list(model.parameters()), lr=0.01)
 
@@ -57,7 +59,7 @@ def get_node2vec_embedding(data, p, q):
     for epoch in range(1, 101):
         loss = train()
         acc = test()
-        if epoch % 25 == 0:
+        if epoch % 50 == 0:
             print(f'Epoch: {epoch:03d}, Loss: {loss:.3f}, Accuracy: {acc:.3f}')
 
     return model.embedding.weight.cpu().detach().numpy()
