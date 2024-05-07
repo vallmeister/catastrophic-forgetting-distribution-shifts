@@ -56,7 +56,7 @@ def get_node2vec_embedding(data, p, q, length=80, k=10):
         )
         return accuracy
 
-    for epoch in range(1, 101):
+    for epoch in range(1, 151):
         loss = train()
         acc = test()
         if epoch % 50 == 0:

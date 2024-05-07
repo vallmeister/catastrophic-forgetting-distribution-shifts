@@ -61,6 +61,7 @@ if __name__ == "__main__":
             for q in node2vec_embedding.PARAMETERS:
                 for dataset in ['dblp', 'elliptic', 'ogbn']:
                     if ((df['dataset'] == dataset) & (df['p'] == p) & (df['q'] == q)).any():
+                        print(f'{dataset} with {p} and {q} already seen')
                         continue
                     elif dataset == 'dblp':
                         structure_shift = get_dblp_structure_shift(p, q)
