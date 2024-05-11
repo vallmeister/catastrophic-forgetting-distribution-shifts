@@ -1,29 +1,36 @@
+import logging
+import os
 import sys
 
 import torch
 from torch_geometric.nn import Node2Vec
 
 PARAMETERS = [1, 2, 0.5, 0.25, 4]
+logger = logging.getLogger(__name__)
 
 
-def get_node2vec_model(data, p, q, length=80, k=10):
+def get_node2vec_model(data, p, q, length, k):
     return Node2Vec(
         data.edge_index,
         embedding_dim=128,
         walk_length=length,
         context_size=k,
-        walks_per_node=10,
+        walks_per_node=5,
         num_negative_samples=1,
         p=p,
         q=q
     )
 
 
-def get_node2vec_embedding(data, p, q, length=80, k=10):
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+def get_node2vec_embedding(data, p, q, length=125, k=50):
+    #device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = torch.device('cpu')
+    logger.info(f'Using device: {device}')
+    logger.info(f'CPU cores: {os.cpu_count()}')
     num_workers = 4 if sys.platform == 'linux' else 0
+    logger.info(f'num_workers={num_workers}')
     model = get_node2vec_model(data, p, q, length, k).to(device)
-    loader = model.loader(batch_size=32, shuffle=True, num_workers=num_workers)
+    loader = model.loader(batch_size=128, shuffle=True, num_workers=num_workers)
     optimizer = torch.optim.Adam(list(model.parameters()), lr=0.01)
 
     n = len(data.x)
@@ -31,6 +38,9 @@ def get_node2vec_embedding(data, p, q, length=80, k=10):
     train_mask[torch.arange(n) % 2 == 0] = True
     test_mask = torch.zeros(n, dtype=torch.bool)
     test_mask[torch.arange(n) % 2 == 1] = True
+    logger.info(f'Created masks with 50/50 split.')
+    logger.info(f'Train mask: {train_mask[:10]}')
+    logger.info(f'Test mask: {test_mask[:10]}')
 
     def train():
         model.train()
@@ -56,10 +66,11 @@ def get_node2vec_embedding(data, p, q, length=80, k=10):
         )
         return accuracy
 
-    for epoch in range(1, 151):
+    logger.info(f'Starting node2vec training')
+    for epoch in range(1, 101):
         loss = train()
         acc = test()
-        if epoch % 50 == 0:
-            print(f'Epoch: {epoch:03d}, Loss: {loss:.3f}, Accuracy: {acc:.3f}')
+        if epoch % 10 == 0:
+            logger.info(f'Epoch: {epoch:03d}, Loss: {loss:.3f}, Accuracy: {acc:.3f}')
 
     return model.embedding.weight.cpu().detach().numpy()

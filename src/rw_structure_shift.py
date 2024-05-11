@@ -23,7 +23,7 @@ def get_dblp_structure_shift(p1, q1):
 
 
 def get_elliptic_structure_shift(p1, q1):
-    elliptic = torch.load('./data/real_world/elliptic_tasks.pt')
+    elliptic = torch.load('./data/real_world/elliptic_tasks.pt')[-1]
     shift = []
     embedding = get_node2vec_embedding(elliptic, p1, q1)
     x = embedding[elliptic.t == 0]
