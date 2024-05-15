@@ -1,5 +1,4 @@
 import logging
-import os
 import sys
 
 import torch
@@ -15,21 +14,20 @@ def get_node2vec_model(data, p, q, length, k):
         embedding_dim=128,
         walk_length=length,
         context_size=k,
-        walks_per_node=5,
+        walks_per_node=10,
         num_negative_samples=1,
         p=p,
         q=q
     )
 
 
-def get_node2vec_embedding(data, p, q, length=125, k=50):
-    #device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    device = torch.device('cpu')
+def get_node2vec_embedding(data, p, q, length=80, k=10):
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     logger.info(f'Using device: {device}')
-    logger.info(f'CPU cores: {os.cpu_count()}')
     num_workers = 4 if sys.platform == 'linux' else 0
     logger.info(f'num_workers={num_workers}')
     model = get_node2vec_model(data, p, q, length, k).to(device)
+    logger.info(f'node2vec with walk_length={length} and context_size={k}')
     loader = model.loader(batch_size=128, shuffle=True, num_workers=num_workers)
     optimizer = torch.optim.Adam(list(model.parameters()), lr=0.01)
 

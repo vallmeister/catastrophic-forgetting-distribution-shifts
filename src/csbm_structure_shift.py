@@ -11,6 +11,7 @@ from measures import mmd_max_rbf
 from node2vec_embedding import PARAMETERS, get_node2vec_embedding
 
 logger = logging.getLogger(__name__)
+logging.basicConfig(filename='log.log', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
 def get_structure_shift(csbm, p1, q1):
@@ -19,7 +20,7 @@ def get_structure_shift(csbm, p1, q1):
         split_static_csbm(csbm)
         logger.info(f'Added artificial split for static CSBM')
     structure_shift = []
-    embedding = get_node2vec_embedding(csbm, p1, q1, 200, 80)
+    embedding = get_node2vec_embedding(csbm, p1, q1)
     x = embedding[csbm.t == 0]
     for task in range(10):
         z = embedding[csbm.t == task]
@@ -29,8 +30,6 @@ def get_structure_shift(csbm, p1, q1):
 
 
 if __name__ == "__main__":
-    logging.basicConfig(filename='log.log', level=logging.INFO)
-    logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s')
     logger.info('Started')
     fieldnames = ['dataset', 'p', 'q', 'avg_shift', 'max_shift']
 
@@ -46,6 +45,7 @@ if __name__ == "__main__":
             for q in PARAMETERS:
                 for dataset in CSBM_NAMES:
                     name = f'{dataset}_{i:02d}'
+                    npy_name = f'./structure_shifts/{name}_{str(p).replace(".", "")}_{str(q).replace(".", "")}.npy'
                     df = pd.read_csv(file_path)
                     if ((df['dataset'] == name) & (df['p'] == p) & (df['q'] == q)).any():
                         logger.info(f'{dataset} with  p={p} and q={q} already processed')
@@ -53,12 +53,11 @@ if __name__ == "__main__":
                     csbm = torch.load(f'./data/csbm/{name}.pt')[-1]
                     logger.info(f'Calculating structure shift for {name}...')
                     shift = get_structure_shift(csbm, p, q)
-                    logger.info(f'Saving results for {name}')
-                    np.save(f'./structure_shifts/{name}_{str(p).replace(".", "")}_{str(q).replace(".", "")}.npy', shift)
+                    np.save(npy_name, shift)
                     with open(file_path, 'a', newline='') as file:
                         writer = csv.DictWriter(file, fieldnames=fieldnames)
                         writer.writerow({'dataset': dataset, 'p': p, 'q': q, 'avg_shift': sum(shift) / len(shift),
                                          'max_shift': max(shift)})
-                        logger.info(f'Saved results for {name} with p={p} and q={q}')
+                        logger.info(f'Saved results for {name} with p={p} and q={q}\n')
     df = pd.read_csv(file_path).round(4)
     print(f'Structure shift:\n{df.to_string(index=False)}\n')

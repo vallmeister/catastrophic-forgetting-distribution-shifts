@@ -11,7 +11,7 @@ CSBM_NAMES = ['base', 'class', 'feat', 'hom', 'struct', 'zero']
 
 
 class MultiClassCSBM:
-    def __init__(self, n=5000, class_distribution=None, means=None, q_hom=0.005, q_het=0.001, sigma_square=0.1,
+    def __init__(self, n=5000, class_distribution=None, means=None, q_hom=0.0005, q_het=0.0001, sigma_square=0.1,
                  classes=16, dimensions=128):
         self.n = n
         self.classes = classes
@@ -66,14 +66,28 @@ class MultiClassCSBM:
     def generate_edges(self):
         end = len(self.x)
         start = end - self.n
-        t = len(self.x) // self.n
-        q_hom = self.q_hom / t
-        q_het = self.q_het / t
         for i in range(start, end):
-            for j in range(end):
-                if i == j:
-                    continue
-                self.set_edge(i, j, q_hom, q_het)
+            self.generate_homophile_edges(i)
+            self.generate_heterophile_edges(i)
+
+    def generate_homophile_edges(self, source):
+        n_hom = np.random.binomial(self.n, self.q_hom)
+        intra_class_mask = self.y == self.y[source]
+        intra_class_mask[source] = False
+        self.set_edges(intra_class_mask, n_hom, source)
+
+    def generate_heterophile_edges(self, source):
+        n_het = np.random.binomial(self.n, self.q_het)
+        inter_class_mask = self.y != self.y[source]
+        self.set_edges(inter_class_mask, n_het, source)
+
+    def set_edges(self, intra_class_mask, num, source):
+        indices = torch.where(intra_class_mask)[0]
+        m = indices.size()[0]
+        num = min(num, m)
+        permuted_indices = torch.randperm(m)[:num]
+        self.edge_sources.extend([source] * num)
+        self.edge_targets.extend(indices[permuted_indices].tolist())
 
     def set_edge(self, u, v, p, q):
         if self.y[u].item() == self.y[v].item() and np.random.binomial(1, p):
@@ -123,7 +137,7 @@ class MultiClassCSBM:
 
 
 class FeatureCSBM(MultiClassCSBM):
-    def __init__(self, n=5000, class_distribution=None, means=None, q_hom=0.005, q_het=0.001, sigma_square=0.1,
+    def __init__(self, n=5000, class_distribution=None, means=None, q_hom=0.0005, q_het=0.0001, sigma_square=0.1,
                  classes=16, dimensions=128):
         super().__init__(n,
                          class_distribution,
@@ -184,7 +198,7 @@ class FeatureCSBM(MultiClassCSBM):
 
 class StructureCSBM(MultiClassCSBM):
 
-    def __init__(self, n=5000, class_distribution=None, means=None, q_hom=0.05, q_het=0.01, sigma_square=0.1,
+    def __init__(self, n=5000, class_distribution=None, means=None, q_hom=0.0005, q_het=0.0001, sigma_square=0.1,
                  classes=16, dimensions=128):
         self.max_degree = 1
         super().__init__(n,
@@ -210,7 +224,7 @@ class StructureCSBM(MultiClassCSBM):
 
 
 class ClassCSBM(MultiClassCSBM):
-    def __init__(self, n=5000, class_distribution=None, means=None, q_hom=0.005, q_het=0.001, sigma_square=0.1,
+    def __init__(self, n=5000, class_distribution=None, means=None, q_hom=0.0005, q_het=0.0001, sigma_square=0.1,
                  classes=16, dimensions=128):
 
         def rho_iter():
@@ -263,17 +277,17 @@ class HomophilyCSBM(MultiClassCSBM):
                          classes,
                          dimensions)
 
-    def generate_edges(self):
-        end = len(self.x)
-        start = end - self.n
-        t = len(self.x) // self.n
-        q_hom = self.q_hom / t ** 2
-        q_het = self.q_het / t
-        for i in range(start, end):
-            for j in range(end):
-                if i == j:
-                    continue
-                self.set_edge(i, j, q_hom, q_het)
+    def generate_homophile_edges(self, source):
+        t = self.t.max().item() + 1
+        n_hom = np.random.binomial(self.n, self.q_hom / t)
+        intra_class_mask = self.y == self.y[source]
+        intra_class_mask[source] = False
+        self.set_edges(intra_class_mask, n_hom, source)
+
+    def generate_heterophile_edges(self, source):
+        n_het = np.random.binomial(self.n, self.q_het)
+        inter_class_mask = self.y != self.y[source]
+        self.set_edges(inter_class_mask, n_het, source)
 
 
 def split_static_csbm(csbm):
