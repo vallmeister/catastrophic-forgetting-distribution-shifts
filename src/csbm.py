@@ -89,14 +89,6 @@ class MultiClassCSBM:
         self.edge_sources.extend([source] * num)
         self.edge_targets.extend(indices[permuted_indices].tolist())
 
-    def set_edge(self, u, v, p, q):
-        if self.y[u].item() == self.y[v].item() and np.random.binomial(1, p):
-            self.edge_sources.append(u)
-            self.edge_targets.append(v)
-        elif self.y[u].item() != self.y[v].item() and np.random.binomial(1, q):
-            self.edge_sources.append(u)
-            self.edge_targets.append(v)
-
     def get_data(self):
         edge_index = torch.tensor([self.edge_sources, self.edge_targets], dtype=torch.long)
         x = torch.tensor(self.x, dtype=torch.float)
@@ -210,17 +202,10 @@ class StructureCSBM(MultiClassCSBM):
                          classes,
                          dimensions)
 
-    def generate_edges(self):
-        end = len(self.x)
-        start = end - self.n
-        for i in range(start, end):
-            for j in range(end):
-                if i == j:
-                    continue
-                t = j // self.n + 1
-                q_hom = self.q_hom / t
-                q_het = self.q_het / t
-                self.set_edge(i, j, q_hom, q_het)
+    def evolve(self):
+        self.q_hom *= 1.1
+        self.q_het *= 1.1
+        super().evolve()
 
 
 class ClassCSBM(MultiClassCSBM):
@@ -277,17 +262,11 @@ class HomophilyCSBM(MultiClassCSBM):
                          classes,
                          dimensions)
 
-    def generate_homophile_edges(self, source):
-        t = self.t.max().item() + 1
-        n_hom = np.random.binomial(self.n, self.q_hom / t)
-        intra_class_mask = self.y == self.y[source]
-        intra_class_mask[source] = False
-        self.set_edges(intra_class_mask, n_hom, source)
-
-    def generate_heterophile_edges(self, source):
-        n_het = np.random.binomial(self.n, self.q_het)
-        inter_class_mask = self.y != self.y[source]
-        self.set_edges(inter_class_mask, n_het, source)
+    def evolve(self):
+        diff = 0.1 * self.q_hom
+        self.q_hom -= diff
+        self.q_het += diff
+        super().evolve()
 
 
 def split_static_csbm(csbm):

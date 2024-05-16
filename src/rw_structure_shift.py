@@ -11,7 +11,10 @@ from measures import mmd_max_rbf
 from node2vec_embedding import get_node2vec_embedding
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(filename='log.log', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(filename='log.log',
+                    filemode='w',
+                    level=logging.INFO,
+                    format='%(asctime)s - %(levelname)s - %(message)s')
 
 
 def get_dblp_structure_shift(p1, q1):
