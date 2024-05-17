@@ -251,7 +251,7 @@ class ClassCSBM(MultiClassCSBM):
 
 
 class HomophilyCSBM(MultiClassCSBM):
-    def __init__(self, n=5000, class_distribution=None, means=None, q_hom=0.005, q_het=0.001, sigma_square=0.1,
+    def __init__(self, n=5000, class_distribution=None, means=None, q_hom=0.0005, q_het=0.0001, sigma_square=0.1,
                  classes=16, dimensions=128):
         super().__init__(n,
                          class_distribution,
