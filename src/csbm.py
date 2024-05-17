@@ -203,8 +203,8 @@ class StructureCSBM(MultiClassCSBM):
                          dimensions)
 
     def evolve(self):
-        self.q_hom *= 1.1
-        self.q_het *= 1.1
+        self.q_hom *= 1.2
+        self.q_het *= 1.2
         super().evolve()
 
 
