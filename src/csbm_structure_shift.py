@@ -18,7 +18,6 @@ logging.basicConfig(filename='log.log',
 
 
 def get_structure_shift(csbm, p1, q1):
-    logger.info(f'Starting calculation with p={p1} and q={q1}')
     if len(torch.unique(csbm.t)) == 1:
         split_static_csbm(csbm)
         logger.info(f'Added artificial split for static CSBM')
@@ -28,7 +27,6 @@ def get_structure_shift(csbm, p1, q1):
     for task in range(10):
         z = embedding[csbm.t == task]
         structure_shift.append(mmd_max_rbf(x, z, len(x[0])))
-        logger.info(f'Calculated shift for {task}th task.')
     return structure_shift
 
 
@@ -41,7 +39,6 @@ if __name__ == "__main__":
     if not os.path.exists(file_path):
         with open(file_path, 'w', newline='') as file:
             csv.DictWriter(file, fieldnames=fieldnames).writeheader()
-            logger.info('CSV-file created.')
 
     for i in range(1):
         for p in PARAMETERS:
@@ -54,13 +51,13 @@ if __name__ == "__main__":
                         logger.info(f'{dataset} with  p={p} and q={q} already processed')
                         continue
                     csbm = torch.load(f'./data/csbm/{name}.pt')[-1]
-                    logger.info(f'Calculating structure shift for {name}...')
+                    logger.info(f'Calculating structure shift for {name} with p={p} and q={q}')
                     shift = get_structure_shift(csbm, p, q)
                     np.save(npy_name, shift)
                     with open(file_path, 'a', newline='') as file:
                         writer = csv.DictWriter(file, fieldnames=fieldnames)
                         writer.writerow({'dataset': dataset, 'p': p, 'q': q, 'avg_shift': sum(shift) / len(shift),
                                          'max_shift': max(shift)})
-                        logger.info(f'Saved results for {name} with p={p} and q={q}\n')
+                        logger.info(f'Results saved\n')
     df = pd.read_csv(file_path).round(4)
     print(f'Structure shift:\n{df.to_string(index=False)}\n')

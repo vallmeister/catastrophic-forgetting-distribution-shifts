@@ -25,7 +25,6 @@ def get_node2vec_embedding(data, p, q, length=80, k=10):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     logger.info(f'Using device: {device}')
     num_workers = 4 if sys.platform == 'linux' else 0
-    logger.info(f'num_workers={num_workers}')
     model = get_node2vec_model(data, p, q, length, k).to(device)
     logger.info(f'node2vec with walk_length={length} and context_size={k}')
     loader = model.loader(batch_size=128, shuffle=True, num_workers=num_workers)
@@ -68,7 +67,7 @@ def get_node2vec_embedding(data, p, q, length=80, k=10):
     for epoch in range(1, 101):
         loss = train()
         acc = test()
-        if epoch % 10 == 0:
+        if epoch % 20 == 0:
             logger.info(f'Epoch: {epoch:03d}, Loss: {loss:.3f}, Accuracy: {acc:.3f}')
 
     return model.embedding.weight.cpu().detach().numpy()
