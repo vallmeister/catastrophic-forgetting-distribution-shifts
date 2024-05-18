@@ -1,0 +1,168 @@
+import random
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torch_geometric.nn import GCNConv
+
+from measures import Result
+
+
+class CM_sampler(nn.Module):
+    # sampler for ERGNN CM and CM*
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, ids_per_cls_train, budget, feats):
+        return self.sampling(ids_per_cls_train, budget, feats)
+
+    def sampling(self, ids_per_cls_train, budget, vecs):
+        budget_dist_compute = 1000
+        ids_selected = []
+        for i, ids in enumerate(ids_per_cls_train):
+            other_cls_ids = list(range(len(ids_per_cls_train)))
+            other_cls_ids.pop(i)
+            ids_selected0 = ids_per_cls_train[i] if len(ids_per_cls_train[i]) < budget_dist_compute else random.choices(
+                ids_per_cls_train[i], k=budget_dist_compute)
+
+            dist = []
+            vecs_0 = vecs[ids_selected0]
+            for j in other_cls_ids:
+                chosen_ids = random.choices(ids_per_cls_train[j], k=min(budget_dist_compute, len(ids_per_cls_train[j])))
+                vecs_1 = vecs[chosen_ids]
+                if len(chosen_ids) < 26 or len(ids_selected0) < 26:
+                    # torch.cdist throws error for tensor smaller than 26
+                    dist.append(torch.cdist(vecs_0.float(), vecs_1.float()).half())
+                else:
+                    dist.append(torch.cdist(vecs_0, vecs_1))
+
+            dist_ = torch.cat(dist, dim=-1)  # include distance to all the other classes
+            dist_ = torch.sum(dist_, dim=1)
+            rank = dist_.sort()
+            rank = rank[1].tolist()
+            current_ids_selected = rank[:budget]
+            ids_selected.extend([ids_per_cls_train[i][j] for j in current_ids_selected])
+        return ids_selected
+
+
+class NET(torch.nn.Module):
+    """
+        ER-GNN baseline for NCGL tasks
+
+        :param model: The backbone GNNs, e.g. GCN, GAT, GIN, etc.
+        :param task_manager: Mainly serves to store the indices of the output dimensions corresponding to each task
+        :param args: The arguments containing the configurations of the experiments including the training parameters like the learning rate, the setting confugurations like class-IL and task-IL, etc. These arguments are initialized in the train.py file and can be specified by the users upon running the code.
+
+        """
+
+    def __init__(self, model):
+        super(NET, self).__init__()
+
+        # setup network
+        self.net = model
+        self.sampler = CM_sampler()
+
+        # setup optimizer
+        self.opt = torch.optim.Adam(self.net.parameters(), lr=0.01, weight_decay=5e-4)
+
+        # setup losses
+        self.ce = torch.nn.functional.cross_entropy
+
+        # setup memories
+        self.current_task = -1
+        self.buffer_node_ids = []
+        self.budget = 1
+        self.aux_data = None
+        self.aux_features = None
+        self.aux_labels = None
+        self.aux_loss_w_ = None
+
+    def forward(self, features):
+        output = self.net(features)
+        return output
+
+    def observe(self, data):
+        dev = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        features = data.x
+        labels = data.y
+        train_mask = data.train_mask
+        ids_per_cls = []
+        cls_list = sorted(torch.unique(labels).tolist())
+        for cls in cls_list:
+            id_mask = train_mask & (labels == cls)
+            ids = torch.where(id_mask)[0]
+            ids_per_cls.append(ids.tolist())
+        self.net.train()
+        n_nodes = train_mask.sum().item()
+        buffer_size = len(self.buffer_node_ids)
+        beta = buffer_size / (buffer_size + n_nodes)
+
+        self.net.zero_grad()
+        output = self.net(data)
+        output_labels = labels[train_mask]
+
+        n_per_cls = [(output_labels == j).sum() for j in cls_list]
+        loss_w_ = [1. / max(i, 1) for i in n_per_cls]  # weight to balance the loss of different class
+
+        loss_w_ = torch.tensor(loss_w_).to(dev)
+        loss = self.ce(output[train_mask], labels[train_mask], weight=loss_w_)
+
+        if not self.aux_data or self.aux_features.size(0) < features.size(0):
+            sampled_ids = self.sampler(ids_per_cls, self.budget, features)
+            self.buffer_node_ids.extend(sampled_ids)
+            self.aux_data = data.clone()
+            self.aux_features, self.aux_labels = self.aux_data.x, self.aux_data.y
+        n_per_cls = [(self.aux_labels == j).sum() for j in cls_list]
+        loss_w_ = [1. / max(i, 1) for i in n_per_cls]  # weight to balance the loss of different class
+        self.aux_loss_w_ = torch.tensor(loss_w_).to(dev)
+
+        # calculate auxiliary loss based on replay if not the first task
+        output = self.net(self.aux_data)
+        loss_aux = self.ce(output[self.buffer_node_ids], self.aux_labels[self.buffer_node_ids], weight=self.aux_loss_w_)
+        loss = beta * loss + (1 - beta) * loss_aux
+        loss.backward()
+        self.opt.step()
+        return loss
+
+
+class GCN(torch.nn.Module):
+    def __init__(self, feature_dim, num_classes):
+        super().__init__()
+        self.conv1 = GCNConv(feature_dim, 128)
+        self.conv2 = GCNConv(128, num_classes)
+
+    def forward(self, data):
+        x, edge_index = data.x, data.edge_index
+
+        x = self.conv1(x, edge_index)
+        x = F.relu(x)
+        x = F.dropout(x, training=self.training, p=0.2)
+        x = self.conv2(x, edge_index)
+
+        return F.log_softmax(x, dim=1)
+
+
+if __name__ == "__main__":
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    data_list = torch.load('./data/csbm/feat_00.pt')
+    gnn = GCN(128, 16).to(device)
+    er_model = NET(gnn)
+    t = len(data_list)
+    result_matrix = torch.empty((t, t), dtype=torch.float)
+    for i, data_i in enumerate(data_list):
+        data_i = data_i.to(device)
+        for epoch in range(1, 201):
+            loss = er_model.observe(data_i)
+        for j, data_j in enumerate(data_list):
+            data_j = data_j.to(device)
+            er_model.eval()
+            pred = er_model(data_j).argmax(dim=1)
+            correct = (pred[data_j.test_mask] == data_j.y[data_j.test_mask]).sum()
+            acc = int(correct) / int(data_j.test_mask.sum())
+            result_matrix[i][j] = acc
+    torch.set_printoptions(precision=2)
+    print(result_matrix)
+    result = Result(data_list, er_model, device)
+    result.result_matrix = result_matrix
+    print(f'AP: {result.get_average_accuracy():.2f}')
+    print(f'AF: {result.get_average_forgetting_measure():.2f}')
