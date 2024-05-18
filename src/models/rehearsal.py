@@ -2,10 +2,6 @@ import random
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-from torch_geometric.nn import GCNConv
-
-from measures import Result
 
 
 class CM_sampler(nn.Module):
@@ -37,15 +33,14 @@ class CM_sampler(nn.Module):
                     dist.append(torch.cdist(vecs_0, vecs_1))
 
             dist_ = torch.cat(dist, dim=-1)  # include distance to all the other classes
-            dist_ = torch.sum(dist_, dim=1)
-            rank = dist_.sort()
-            rank = rank[1].tolist()
+            dist_ = torch.mean(dist_, dim=1)
+            rank = dist_.sort(descending=True)[1].tolist()
             current_ids_selected = rank[:budget]
             ids_selected.extend([ids_per_cls_train[i][j] for j in current_ids_selected])
         return ids_selected
 
 
-class NET(torch.nn.Module):
+class ExperienceReplay(torch.nn.Module):
     """
         ER-GNN baseline for NCGL tasks
 
@@ -56,14 +51,14 @@ class NET(torch.nn.Module):
         """
 
     def __init__(self, model):
-        super(NET, self).__init__()
+        super(ExperienceReplay, self).__init__()
 
         # setup network
         self.net = model
         self.sampler = CM_sampler()
 
         # setup optimizer
-        self.opt = torch.optim.Adam(self.net.parameters(), lr=0.01, weight_decay=5e-4)
+        self.opt = torch.optim.Adam(self.net.parameters(), lr=0.01, weight_decay=0.001)
 
         # setup losses
         self.ce = torch.nn.functional.cross_entropy
@@ -123,46 +118,3 @@ class NET(torch.nn.Module):
         loss.backward()
         self.opt.step()
         return loss
-
-
-class GCN(torch.nn.Module):
-    def __init__(self, feature_dim, num_classes):
-        super().__init__()
-        self.conv1 = GCNConv(feature_dim, 128)
-        self.conv2 = GCNConv(128, num_classes)
-
-    def forward(self, data):
-        x, edge_index = data.x, data.edge_index
-
-        x = self.conv1(x, edge_index)
-        x = F.relu(x)
-        x = F.dropout(x, training=self.training, p=0.2)
-        x = self.conv2(x, edge_index)
-
-        return F.log_softmax(x, dim=1)
-
-
-if __name__ == "__main__":
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    data_list = torch.load('./data/csbm/feat_00.pt')
-    gnn = GCN(128, 16).to(device)
-    er_model = NET(gnn)
-    t = len(data_list)
-    result_matrix = torch.empty((t, t), dtype=torch.float)
-    for i, data_i in enumerate(data_list):
-        data_i = data_i.to(device)
-        for epoch in range(1, 201):
-            loss = er_model.observe(data_i)
-        for j, data_j in enumerate(data_list):
-            data_j = data_j.to(device)
-            er_model.eval()
-            pred = er_model(data_j).argmax(dim=1)
-            correct = (pred[data_j.test_mask] == data_j.y[data_j.test_mask]).sum()
-            acc = int(correct) / int(data_j.test_mask.sum())
-            result_matrix[i][j] = acc
-    torch.set_printoptions(precision=2)
-    print(result_matrix)
-    result = Result(data_list, er_model, device)
-    result.result_matrix = result_matrix
-    print(f'AP: {result.get_average_accuracy():.2f}')
-    print(f'AF: {result.get_average_forgetting_measure():.2f}')

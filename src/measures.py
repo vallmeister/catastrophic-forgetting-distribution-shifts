@@ -87,3 +87,20 @@ class Result:
             return 1 / (max(1, tasks - 1)) * sum(self.get_forgetting_measure(i, tasks - 1) for i in range(tasks))
         else:
             return 0
+
+
+def get_average_accuracy(matrix):
+    t = matrix.size(0)
+    return 1 / t * sum(matrix[-1][i].item() for i in range(t))
+
+
+def get_forgetting_value(matrix, i, j):
+    return max(matrix[k][i].item() for k in range(j)) - matrix[j][i].item()
+
+
+def get_average_forgetting_measure(matrix):
+    t = matrix.size(0)
+    if t > 1:
+        return 1 / (t - 1) * sum(get_forgetting_value(matrix, i, t - 1) for i in range(t))
+    else:
+        return 0
