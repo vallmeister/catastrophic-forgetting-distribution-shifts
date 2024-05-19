@@ -12,7 +12,7 @@ def evaluate(model, data):
 
 if __name__ == "__main__":
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    data_list = torch.load("data/csbm/hom_03.pt")
+    data_list = torch.load("data/csbm/zero_01.pt")
     num_features = data_list[0].x.size(1)
     num_classes = torch.unique(data_list[0].y).numel()
     t = len(data_list)
@@ -31,11 +31,11 @@ if __name__ == "__main__":
 
     for i, data_i in enumerate(data_list):
         for epoch in range(1, 101):
-            gcn_retraining.observe(data_i.clone().to(device))
-            reg_gcn.observe(data_i.clone().to(device), i)
-            er_gcn.observe(data_i.clone().to(device))
+            gcn_retraining.observe(data_i.clone().subgraph(data_i.train_mask).to(device))
+            reg_gcn.observe(data_i.clone().subgraph(data_i.train_mask).to(device), i)
+            er_gcn.observe(data_i.clone().subgraph(data_i.train_mask).to(device))
             if i == 0:
-                gcn_no_retraining.observe(data_i.clone().to(device))
+                gcn_no_retraining.observe(data_i.clone().subgraph(data_i.train_mask).to(device))
         for j, data_j in enumerate(data_list):
             retraining_matrix[i][j] = evaluate(gcn_retraining, data_j.clone().to(device))
             no_retraining_matrix[i][j] = evaluate(gcn_no_retraining, data_j.clone().to(device))
