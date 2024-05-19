@@ -147,7 +147,7 @@ def get_ogbn_arxiv_tasks():
     return data_list
 
 
-def get_mask(mask, train=0.8, val=0.1, test=0.1, seed=None):
+def get_mask(mask, train=0.6, val=0.2, test=0.2, seed=None):
     if train + val + test != 1.0:
         raise ValueError("Split must sum to 1")
 
