@@ -83,7 +83,7 @@ class MultiClassCSBM:
 
     def set_edges(self, intra_class_mask, num, source):
         indices = torch.where(intra_class_mask)[0]
-        m = indices.size()[0]
+        m = indices.size(0)
         num = min(num, m)
         permuted_indices = torch.randperm(m)[:num]
         self.edge_sources.extend([source] * num)
@@ -203,9 +203,33 @@ class StructureCSBM(MultiClassCSBM):
                          dimensions)
 
     def evolve(self):
-        self.q_hom *= 1.5
-        self.q_het *= 1.5
+        self.q_hom *= 1.2
+        self.q_het *= 1.2
         super().evolve()
+
+    def generate_homophile_edges(self, source):
+        n_hom = np.random.binomial(self.n, self.q_hom)
+
+        intra_class_mask = self.y == self.y[source]
+        intra_class_mask[source] = False
+
+        t_max = torch.max(self.t).item()
+        total = sum(1 / t for t in range(1, t_max + 1))
+
+        for t in range(t_max):
+            t_mask = self.t == t
+            self.set_edges(intra_class_mask & t_mask, int(n_hom / (t + 1) / total), source)
+
+    def generate_heterophile_edges(self, source):
+        n_het = np.random.binomial(self.n, self.q_het)
+        inter_class_mask = self.y != self.y[source]
+
+        t_max = torch.max(self.t).item()
+        total = sum(1 / t for t in range(1, t_max + 1))
+
+        for t in range(t_max):
+            t_mask = self.t == t
+            self.set_edges(inter_class_mask & t_mask, int(n_het / (t + 1) / total), source)
 
 
 class ClassCSBM(MultiClassCSBM):
