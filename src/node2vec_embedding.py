@@ -4,7 +4,7 @@ import sys
 import torch
 from torch_geometric.nn import Node2Vec
 
-PARAMETERS = [1, 2, 0.5, 0.25, 4]
+PARAMETERS = [1, 2, 0.5]  # , 0.25, 4]
 logger = logging.getLogger(__name__)
 
 

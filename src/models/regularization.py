@@ -30,7 +30,7 @@ class Twp(torch.nn.Module):
     def forward(self, features):
         return self.net(features)
 
-    def observe(self, dataset, t):
+    def observe(self, data, t):
         self.net.train()
 
         # if new task
@@ -42,7 +42,7 @@ class Twp(torch.nn.Module):
 
             # computing gradient for the previous task
             output = self.net(self.mem_task)
-            loss = self.ce((output[self.mem_mask]), self.mem_task.y[self.mem_mask])
+            loss = self.ce(output, self.mem_task.y)
             loss.backward(retain_graph=True)
 
             for p in self.net.parameters():
@@ -56,17 +56,14 @@ class Twp(torch.nn.Module):
                 self.fisher_att[self.current_task].append(pg)
 
             self.current_task = t
-            self.mem_mask = None
             self.mem_task = None
 
-        if self.mem_mask is None:
-            self.mem_mask = dataset.train_mask.data.clone()
         if self.mem_task is None:
-            self.mem_task = dataset.clone()
+            self.mem_task = data.clone()
 
         self.net.zero_grad()
-        output = self.net(dataset)
-        loss = self.ce(output[dataset.train_mask], dataset.y[dataset.train_mask])
+        output = self.net(data)
+        loss = self.ce(output, data.y)
 
         loss.backward(retain_graph=True)
         grad_norm = 0
