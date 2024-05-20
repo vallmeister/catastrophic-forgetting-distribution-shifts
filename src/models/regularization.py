@@ -80,3 +80,4 @@ class Twp(torch.nn.Module):
         loss = loss + self.beta * grad_norm
         loss.backward()
         self.opt.step()
+        return loss

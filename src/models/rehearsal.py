@@ -75,7 +75,7 @@ class ExperienceReplay(torch.nn.Module):
         output = self.net(features)
         return output
 
-    def observe(self, data):
+    def observe(self, data, t):
         dev = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         features = data.x
         labels = data.y
@@ -100,19 +100,26 @@ class ExperienceReplay(torch.nn.Module):
         loss_w_ = torch.tensor(loss_w_).to(dev)
         loss = self.ce(output[train_mask], labels[train_mask], weight=loss_w_)
 
-        if not self.aux_data or self.aux_features.size(0) < features.size(0):
+        if t != self.current_task:
+            self.current_task = t
             sampled_ids = self.sampler(ids_per_cls, self.budget, features)
             self.buffer_node_ids.extend(sampled_ids)
-            self.aux_data = data.clone()
-            self.aux_features, self.aux_labels = self.aux_data.x, self.aux_data.y
-        n_per_cls = [(self.aux_labels == j).sum() for j in range(self.num_classes)]
-        loss_w_ = [1. / max(i, 1) for i in n_per_cls]  # weight to balance the loss of different class
-        self.aux_loss_w_ = torch.tensor(loss_w_).to(dev)
 
-        # calculate auxiliary loss based on replay if not the first task
-        output = self.net(self.aux_data)
-        loss_aux = self.ce(output[self.buffer_node_ids], self.aux_labels[self.buffer_node_ids], weight=self.aux_loss_w_)
-        loss = beta * loss + (1 - beta) * loss_aux
+            if t > 0:
+                buffer_mask = torch.zeros_like(data.train_mask, dtype=torch.bool)
+                buffer_mask[self.buffer_node_ids] = True
+                self.aux_data = data.clone().subgraph(buffer_mask)
+                self.aux_features, self.aux_labels = self.aux_data.x, self.aux_data.y
+                n_per_cls = [(self.aux_labels == j).sum() for j in range(self.num_classes)]
+                loss_w_ = [1. / max(i, 1) for i in n_per_cls]  # weight to balance the loss of different class
+                self.aux_loss_w_ = torch.tensor(loss_w_).to(dev)
+
+        if t != 0:
+            # calculate auxiliary loss based on replay if not the first task
+            output = self.net(self.aux_data)
+            loss_aux = self.ce(output, self.aux_labels, weight=self.aux_loss_w_)
+            loss = beta * loss + (1 - beta) * loss_aux
+
         loss.backward()
         self.opt.step()
         return loss

@@ -103,7 +103,7 @@ def get_elliptic_temporal_tasks():
         t = torch.cat((t, torch.full((len(elliptic_temp.x),), time // 5)))
 
     def append_data(curr_t):
-        mask = (y != 2) & t == curr_t
+        mask = (y != 2) & (t == curr_t)
         train_mask, val_mask, test_mask = get_mask(mask, seed=0)
         data_list.append(Data(x=x, y=y, edge_index=edges, train_mask=train_mask, val_mask=val_mask, test_mask=test_mask,
                               t=t))

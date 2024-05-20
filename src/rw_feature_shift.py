@@ -70,19 +70,19 @@ if __name__ == "__main__":
         with open(file_path, 'w', newline='') as file:
             csv.DictWriter(file, fieldnames=fieldnames).writeheader()
 
-    df = pd.read_csv(file_path)
-    with open(file_path, 'a', newline='') as file:
-        writer = csv.DictWriter(file, fieldnames=fieldnames)
-        for dataset in ['dblp', 'elliptic', 'ogbn']:
-            if (df['dataset'] == dataset).any():
-                continue
-            elif dataset == 'dblp':
-                shift = get_dblp_feature_shift()
-            elif dataset == 'elliptic':
-                shift = get_elliptic_feature_shift()
-            elif dataset == 'ogbn':
-                shift = get_ogbn_feature_shift()
-            np.save(f'./feature_shifts/{dataset}.npy', shift)
+    for dataset in ['dblp', 'elliptic', 'ogbn']:
+        df = pd.read_csv(file_path)
+        if (df['dataset'] == dataset).any():
+            continue
+        elif dataset == 'dblp':
+            shift = get_dblp_feature_shift()
+        elif dataset == 'elliptic':
+            shift = get_elliptic_feature_shift()
+        elif dataset == 'ogbn':
+            shift = get_ogbn_feature_shift()
+        np.save(f'./feature_shifts/{dataset}.npy', shift)
+        with open(file_path, 'a', newline='') as file:
+            writer = csv.DictWriter(file, fieldnames=fieldnames)
             writer.writerow({'dataset': dataset, 'avg_shift': sum(shift) / max(1, len(shift)), 'max_shift': max(shift)})
 
     df = pd.read_csv(file_path).round(4)

@@ -20,10 +20,11 @@ class GCN(torch.nn.Module):
 
         return F.log_softmax(x, dim=1)
 
-    def observe(self, data):
+    def observe(self, data, task):
         self.opt.zero_grad()
         train_mask = data.train_mask
         out = self(data)
         loss = F.nll_loss(out[train_mask], data.y[train_mask])
         loss.backward()
         self.opt.step()
+        return loss

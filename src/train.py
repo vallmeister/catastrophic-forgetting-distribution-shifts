@@ -8,19 +8,17 @@ from models import GCN, Twp, ExperienceReplay
 from util import EarlyStopping
 
 
-def train(model, data, task=0, reg=False):
+def train(model, data, task, f1=False):
     es = EarlyStopping(Path('./gcn_backup.pt'), model)
     train_data = data.clone().subgraph(data.train_mask)
     val_data = data.clone().subgraph(data.val_mask)
     for epoch in range(1, 501):
-        if reg:
-            model.observe(train_data, task)
-        else:
-            model.observe(train_data)
-        val_acc = evaluate(model, val_data)
+        model.observe(train_data, task)
+        val_acc = evaluate(model, val_data, f1)
         if es(val_acc):
             model.load_state_dict(torch.load(es.path))
             return epoch
+    return 500
 
 
 def evaluate(model, data, f1=False):
@@ -34,9 +32,10 @@ def evaluate(model, data, f1=False):
 
 if __name__ == "__main__":
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    data_list = torch.load("data/csbm/hom_01.pt")
+    data_list = torch.load("data/real_world/elliptic_tasks.pt")
     num_features = data_list[0].x.size(1)
-    num_classes = torch.unique(data_list[0].y).numel()
+    print(torch.unique(data_list[0].y[data_list[0].train_mask]))
+    num_classes = torch.unique(data_list[0].y[data_list[0].train_mask]).numel()
     t = len(data_list)
 
     gcn_ret = GCN(num_features, num_classes).to(device)
@@ -59,10 +58,8 @@ if __name__ == "__main__":
             gcn = gcn_list[k]
             matrix = matrix_list[k]
             ep = -1
-            if k == 2:
-                ep = train(gcn, data_i.clone().to(device), i)
-            elif k != 1 or k == 1 and i == 0:
-                ep = train(gcn, data_i.clone().to(device))
+            if k != 1 or k == 1 and i == 0:
+                ep = train(gcn, data_i.clone().to(device), i, True)
             print(f'Early stopped after {ep}th epoch')
 
             for j, data_j in enumerate(data_list):
