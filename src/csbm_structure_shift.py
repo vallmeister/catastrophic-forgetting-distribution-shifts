@@ -12,7 +12,7 @@ from node2vec_embedding import PARAMETERS, get_node2vec_embedding
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(filename='log.log',
-                    filemode= 'w',
+                    filemode='w',
                     level=logging.INFO,
                     format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -51,7 +51,7 @@ if __name__ == "__main__":
                         logger.info(f'{dataset} with  p={p} and q={q} already processed')
                         continue
                     csbm = torch.load(f'./data/csbm/{name}.pt')[-1]
-                    logger.info(f'Calculating structure shift for {name} with p={p} and q={q}')
+                    logger.info(f'Structure shift: {name.ljust(12)}| p={p} | q={q} | |E|={csbm.edge_index.size(1)}')
                     shift = get_structure_shift(csbm, p, q)
                     np.save(npy_name, shift)
                     with open(file_path, 'a', newline='') as file:
