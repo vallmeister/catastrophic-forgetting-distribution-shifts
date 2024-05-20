@@ -113,7 +113,7 @@ def get_elliptic_temporal_tasks():
         end = start + (4 if task == 0 else 5)
         for i in range(start, end):
             append_snapshot(i)
-        append_data()
+        append_data(task)
     return data_list
 
 
