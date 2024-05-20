@@ -45,17 +45,16 @@ class ExperienceReplay(torch.nn.Module):
         ER-GNN baseline for NCGL tasks
 
         :param model: The backbone GNNs, e.g. GCN, GAT, GIN, etc.
-        :param task_manager: Mainly serves to store the indices of the output dimensions corresponding to each task
-        :param args: The arguments containing the configurations of the experiments including the training parameters like the learning rate, the setting confugurations like class-IL and task-IL, etc. These arguments are initialized in the train.py file and can be specified by the users upon running the code.
 
         """
 
-    def __init__(self, model):
+    def __init__(self, model, num_cls):
         super(ExperienceReplay, self).__init__()
 
         # setup network
         self.net = model
         self.sampler = CM_sampler()
+        self.num_classes = num_cls
 
         # setup optimizer
         self.opt = torch.optim.Adam(self.net.parameters(), lr=0.01, weight_decay=0.001)
@@ -82,8 +81,7 @@ class ExperienceReplay(torch.nn.Module):
         labels = data.y
         train_mask = data.train_mask
         ids_per_cls = []
-        cls_list = sorted(torch.unique(labels).tolist())
-        for cls in cls_list:
+        for cls in range(self.num_classes):
             id_mask = train_mask & (labels == cls)
             ids = torch.where(id_mask)[0]
             ids_per_cls.append(ids.tolist())
@@ -96,7 +94,7 @@ class ExperienceReplay(torch.nn.Module):
         output = self.net(data)
         output_labels = labels[train_mask]
 
-        n_per_cls = [(output_labels == j).sum() for j in cls_list]
+        n_per_cls = [(output_labels == j).sum() for j in range(self.num_classes)]
         loss_w_ = [1. / max(i, 1) for i in n_per_cls]  # weight to balance the loss of different class
 
         loss_w_ = torch.tensor(loss_w_).to(dev)
@@ -107,7 +105,7 @@ class ExperienceReplay(torch.nn.Module):
             self.buffer_node_ids.extend(sampled_ids)
             self.aux_data = data.clone()
             self.aux_features, self.aux_labels = self.aux_data.x, self.aux_data.y
-        n_per_cls = [(self.aux_labels == j).sum() for j in cls_list]
+        n_per_cls = [(self.aux_labels == j).sum() for j in range(self.num_classes)]
         loss_w_ = [1. / max(i, 1) for i in n_per_cls]  # weight to balance the loss of different class
         self.aux_loss_w_ = torch.tensor(loss_w_).to(dev)
 

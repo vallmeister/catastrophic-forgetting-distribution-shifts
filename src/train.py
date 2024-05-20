@@ -1,52 +1,79 @@
+from pathlib import Path
+
 import torch
-from models import GCN, Twp, ExperienceReplay
+from sklearn import metrics
+
 from measures import get_average_forgetting_measure, get_average_accuracy
+from models import GCN, Twp, ExperienceReplay
+from util import EarlyStopping
 
 
-def evaluate(model, data):
+def train(model, data, task=0, reg=False):
+    es = EarlyStopping(Path('./gcn_backup.pt'), model)
+    train_data = data.clone().subgraph(data.train_mask)
+    val_data = data.clone().subgraph(data.val_mask)
+    for epoch in range(1, 501):
+        if reg:
+            model.observe(train_data, task)
+        else:
+            model.observe(train_data)
+        val_acc = evaluate(model, val_data)
+        if es(val_acc):
+            model.load_state_dict(torch.load(es.path))
+            return epoch
+
+
+def evaluate(model, data, f1=False):
     model.eval()
     pred = model(data).argmax(dim=1)
+    if f1:
+        return metrics.f1_score(data.y.cpu(), pred.cpu())
     correct = (pred == data.y).sum()
     return int(correct) / int(data.x.size(0))
 
 
 if __name__ == "__main__":
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    data_list = torch.load("data/real_world/ogbn_tasks.pt")
+    data_list = torch.load("data/real_world/elliptic_tasks.pt")
     num_features = data_list[0].x.size(1)
     num_classes = torch.unique(data_list[0].y).numel()
     t = len(data_list)
 
-    gcn_retraining = GCN(num_features, num_classes).to(device)
-    retraining_matrix = torch.empty((t, t), dtype=torch.float)
+    gcn_ret = GCN(num_features, num_classes).to(device)
+    ret_mat = torch.empty((t, t), dtype=torch.float)
 
-    gcn_no_retraining = GCN(num_features, num_classes).to(device)
-    no_retraining_matrix = torch.empty((t, t), dtype=torch.float)
+    gcn_no_ret = GCN(num_features, num_classes).to(device)
+    no_ret_mat = torch.empty((t, t), dtype=torch.float)
 
     reg_gcn = Twp(GCN(num_features, num_classes).to(device))
-    reg_matrix = torch.empty((t, t), dtype=torch.float)
+    reg_mat = torch.empty((t, t), dtype=torch.float)
 
-    er_gcn = ExperienceReplay(GCN(num_features, num_classes).to(device))
-    er_matrix = torch.empty((t, t), dtype=torch.float)
+    er_gcn = ExperienceReplay(GCN(num_features, num_classes).to(device), num_classes)
+    er_mat = torch.empty((t, t), dtype=torch.float)
+
+    gcn_list = [gcn_ret, gcn_no_ret, reg_gcn, er_gcn]
+    matrix_list = [ret_mat, no_ret_mat, reg_mat, er_mat]
 
     for i, data_i in enumerate(data_list):
-        for epoch in range(1, 201):
-            gcn_retraining.observe(data_i.clone().subgraph(data_i.train_mask).to(device))
-            reg_gcn.observe(data_i.clone().subgraph(data_i.train_mask).to(device), i)
-            er_gcn.observe(data_i.clone().subgraph(data_i.train_mask).to(device))
-            if i == 0:
-                gcn_no_retraining.observe(data_i.clone().subgraph(data_i.train_mask).to(device))
-        for j, data_j in enumerate(data_list):
-            retraining_matrix[i][j] = evaluate(gcn_retraining, data_j.clone().subgraph(data_j.test_mask).to(device))
-            no_retraining_matrix[i][j] = evaluate(gcn_no_retraining, data_j.clone().subgraph(data_j.test_mask).to(device))
-            reg_matrix[i][j] = evaluate(reg_gcn, data_j.clone().subgraph(data_j.test_mask).to(device))
-            er_matrix[i][j] = evaluate(er_gcn, data_j.clone().subgraph(data_j.test_mask).to(device))
+        for k in range(len(gcn_list)):
+            gcn = gcn_list[k]
+            matrix = matrix_list[k]
+            ep = -1
+            if k == 2:
+                ep = train(gcn, data_i.clone().to(device), i, True)
+            elif k != 1 or k == 1 and i == 0:
+                ep = train(gcn, data_i.clone().to(device))
+            print(f'Early stopped after {ep}th epoch')
 
-    print("GCN".ljust(20), '|', f'AP: {get_average_accuracy(retraining_matrix):.2f}', '|',
-          f'AF:{get_average_forgetting_measure(retraining_matrix):.2f}')
-    print("GCN cold".ljust(20), '|', f'AP: {get_average_accuracy(no_retraining_matrix):.2f}', '|',
-          f'AF:{get_average_forgetting_measure(no_retraining_matrix):.2f}')
-    print("Regularization".ljust(20), '|', f'AP: {get_average_accuracy(reg_matrix):.2f}', '|',
-          f'AF:{get_average_forgetting_measure(reg_matrix):.2f}')
-    print("Experience Replay".ljust(20), '|', f'AP: {get_average_accuracy(er_matrix):.2f}', '|',
-          f'AF:{get_average_forgetting_measure(er_matrix):.2f}')
+            for j, data_j in enumerate(data_list):
+                matrix[i][j] = evaluate(gcn, data_j.clone().subgraph(data_j.test_mask).to(device), True)
+        print()
+
+    print("GCN".ljust(20), '|', f'AP: {get_average_accuracy(ret_mat, ):.2f}', '|',
+          f'AF:{get_average_forgetting_measure(ret_mat):.2f}')
+    print("GCN cold".ljust(20), '|', f'AP: {get_average_accuracy(no_ret_mat):.2f}', '|',
+          f'AF:{get_average_forgetting_measure(no_ret_mat):.2f}')
+    print("Regularization".ljust(20), '|', f'AP: {get_average_accuracy(reg_mat):.2f}', '|',
+          f'AF:{get_average_forgetting_measure(reg_mat):.2f}')
+    print("Experience Replay".ljust(20), '|', f'AP: {get_average_accuracy(er_mat):.2f}', '|',
+          f'AF:{get_average_forgetting_measure(er_mat):.2f}')
