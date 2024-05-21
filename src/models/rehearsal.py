@@ -12,7 +12,7 @@ class CM_sampler(nn.Module):
     def forward(self, ids_per_cls_train, budget, feats):
         return self.sampling(ids_per_cls_train, budget, feats)
 
-    def sampling(self, ids_per_cls_train, budget, vecs):
+    def sampling(self, ids_per_cls_train, budget, feats):
         budget_dist_compute = 1000
         ids_selected = []
         for i, ids in enumerate(ids_per_cls_train):
@@ -22,10 +22,10 @@ class CM_sampler(nn.Module):
                 ids_per_cls_train[i], k=budget_dist_compute)
 
             dist = []
-            vecs_0 = vecs[ids_selected0]
+            vecs_0 = feats[ids_selected0]
             for j in other_cls_ids:
                 chosen_ids = random.choices(ids_per_cls_train[j], k=min(budget_dist_compute, len(ids_per_cls_train[j])))
-                vecs_1 = vecs[chosen_ids]
+                vecs_1 = feats[chosen_ids]
                 if len(chosen_ids) < 26 or len(ids_selected0) < 26:
                     # torch.cdist throws error for tensor smaller than 26
                     dist.append(torch.cdist(vecs_0.float(), vecs_1.float()).half())
@@ -65,24 +65,24 @@ class ExperienceReplay(torch.nn.Module):
         # setup memories
         self.current_task = -1
         self.buffer_node_ids = []
-        self.budget = 1
+        self.budget = 16
         self.aux_data = None
         self.aux_features = None
         self.aux_labels = None
         self.aux_loss_w_ = None
 
-    def forward(self, features):
-        output = self.net(features)
+    def forward(self, data):
+        output = self.net(data)
         return output
 
     def observe(self, data, t):
         dev = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        features = data.x
-        labels = data.y
         train_mask = data.train_mask
+        features = data.x[train_mask]
+        labels = data.y[train_mask]
         ids_per_cls = []
         for cls in range(self.num_classes):
-            id_mask = train_mask & (labels == cls)
+            id_mask = labels == cls
             ids = torch.where(id_mask)[0]
             ids_per_cls.append(ids.tolist())
         self.net.train()
@@ -91,24 +91,26 @@ class ExperienceReplay(torch.nn.Module):
         beta = buffer_size / (buffer_size + n_nodes)
 
         self.net.zero_grad()
-        output = self.net(data)
-        output_labels = labels[train_mask]
+        output = self.net(data.subgraph(train_mask))
+        # output_labels = labels[train_mask]
 
-        n_per_cls = [(output_labels == j).sum() for j in range(self.num_classes)]
+        n_per_cls = [(labels == j).sum() for j in range(self.num_classes)]
         loss_w_ = [1. / max(i, 1) for i in n_per_cls]  # weight to balance the loss of different class
 
         loss_w_ = torch.tensor(loss_w_).to(dev)
-        loss = self.ce(output[train_mask], labels[train_mask], weight=loss_w_)
+        loss = self.ce(output, labels, weight=loss_w_)
 
         if t != self.current_task:
             self.current_task = t
             sampled_ids = self.sampler(ids_per_cls, self.budget, features)
-            self.buffer_node_ids.extend(sampled_ids)
+            all_node_mask = torch.zeros_like(train_mask, dtype=torch.bool).to(dev)
+            non_zero_indices = torch.nonzero(train_mask, as_tuple=True)[0]
+            all_node_mask[non_zero_indices[sampled_ids]] = True
+            self.buffer_node_ids.extend(torch.where(all_node_mask)[0].tolist())
 
             if t > 0:
-                buffer_mask = torch.zeros_like(data.train_mask, dtype=torch.bool)
-                buffer_mask[self.buffer_node_ids] = True
-                self.aux_data = data.clone().subgraph(buffer_mask)
+                # self.aux_data = data.subgraph(torch.tensor(self.buffer_node_ids, dtype=torch.long).to(dev))
+                self.aux_data = data.clone()
                 self.aux_features, self.aux_labels = self.aux_data.x, self.aux_data.y
                 n_per_cls = [(self.aux_labels == j).sum() for j in range(self.num_classes)]
                 loss_w_ = [1. / max(i, 1) for i in n_per_cls]  # weight to balance the loss of different class
@@ -117,7 +119,8 @@ class ExperienceReplay(torch.nn.Module):
         if t != 0:
             # calculate auxiliary loss based on replay if not the first task
             output = self.net(self.aux_data)
-            loss_aux = self.ce(output, self.aux_labels, weight=self.aux_loss_w_)
+            loss_aux = self.ce(output[self.buffer_node_ids], self.aux_labels[self.buffer_node_ids],
+                               weight=self.aux_loss_w_)
             loss = beta * loss + (1 - beta) * loss_aux
 
         loss.backward()

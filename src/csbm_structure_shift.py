@@ -47,7 +47,7 @@ if __name__ == "__main__":
                     name = f'{dataset}_{i:02d}'
                     npy_name = f'./structure_shifts/{name}_{str(p).replace(".", "")}_{str(q).replace(".", "")}.npy'
                     df = pd.read_csv(file_path)
-                    if ((df['dataset'] == name) & (df['p'] == p) & (df['q'] == q)).any():
+                    if ((df['dataset'] == dataset) & (df['p'] == p) & (df['q'] == q)).any():
                         logger.info(f'{dataset} with  p={p} and q={q} already processed')
                         continue
                     csbm = torch.load(f'./data/csbm/{name}.pt')[-1]

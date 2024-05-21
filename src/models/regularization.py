@@ -19,7 +19,6 @@ class Twp(torch.nn.Module):
         self.fisher_loss = {}
         self.fisher_att = {}
         self.optpar = {}
-        self.mem_mask = None
         self.mem_task = None
 
         # hyper-parameters
@@ -41,8 +40,9 @@ class Twp(torch.nn.Module):
             self.optpar[self.current_task] = []
 
             # computing gradient for the previous task
-            output = self.net(self.mem_task)
-            loss = self.ce(output, self.mem_task.y)
+            mem_mask = self.mem_task.train_mask
+            output = self.net(self.mem_task.subgraph(mem_mask))
+            loss = self.ce(output, self.mem_task.y[mem_mask])
             loss.backward(retain_graph=True)
 
             for p in self.net.parameters():
@@ -61,9 +61,10 @@ class Twp(torch.nn.Module):
         if self.mem_task is None:
             self.mem_task = data.clone()
 
+        train_mask = data.train_mask
         self.net.zero_grad()
-        output = self.net(data)
-        loss = self.ce(output, data.y)
+        output = self.net(data.subgraph(train_mask))
+        loss = self.ce(output, data.y[train_mask])
 
         loss.backward(retain_graph=True)
         grad_norm = 0

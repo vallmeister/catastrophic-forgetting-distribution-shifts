@@ -10,10 +10,9 @@ from util import EarlyStopping
 
 def train(model, data, task, f1=False):
     es = EarlyStopping(Path('./gcn_backup.pt'), model)
-    train_data = data.clone().subgraph(data.train_mask)
     val_data = data.clone().subgraph(data.val_mask)
     for epoch in range(1, 501):
-        model.observe(train_data, task)
+        model.observe(data, task)
         val_acc = evaluate(model, val_data, f1)
         if es(val_acc):
             model.load_state_dict(torch.load(es.path))
@@ -32,9 +31,8 @@ def evaluate(model, data, f1=False):
 
 if __name__ == "__main__":
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    data_list = torch.load("data/real_world/elliptic_tasks.pt")
+    data_list = torch.load("data/csbm/base_03.pt")
     num_features = data_list[0].x.size(1)
-    print(torch.unique(data_list[0].y[data_list[0].train_mask]))
     num_classes = torch.unique(data_list[0].y[data_list[0].train_mask]).numel()
     t = len(data_list)
 
@@ -59,13 +57,12 @@ if __name__ == "__main__":
             matrix = matrix_list[k]
             ep = -1
             if k != 1 or k == 1 and i == 0:
-                ep = train(gcn, data_i.clone().to(device), i, True)
-            print(f'Early stopped after {ep}th epoch')
+                ep = train(gcn, data_i.clone().to(device), i)
+            print(f'Early stopped after {ep} epochs')
 
             for j, data_j in enumerate(data_list):
-                matrix[i][j] = evaluate(gcn, data_j.clone().subgraph(data_j.test_mask).to(device), True)
+                matrix[i][j] = evaluate(gcn, data_j.clone().subgraph(data_j.test_mask).to(device))
         print()
-
     print("GCN".ljust(20), '|', f'AP: {get_average_accuracy(ret_mat, ):.2f}', '|',
           f'AF:{get_average_forgetting_measure(ret_mat):.2f}')
     print("GCN cold".ljust(20), '|', f'AP: {get_average_accuracy(no_ret_mat):.2f}', '|',
