@@ -31,7 +31,7 @@ def evaluate(model, data, f1=False):
 
 if __name__ == "__main__":
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    data_list = torch.load("data/csbm/base_03.pt")
+    data_list = torch.load("data/csbm/feat_08.pt")
     num_features = data_list[0].x.size(1)
     num_classes = torch.unique(data_list[0].y[data_list[0].train_mask]).numel()
     t = len(data_list)
@@ -71,3 +71,9 @@ if __name__ == "__main__":
           f'AF:{get_average_forgetting_measure(reg_mat):.2f}')
     print("Experience Replay".ljust(20), '|', f'AP: {get_average_accuracy(er_mat):.2f}', '|',
           f'AF:{get_average_forgetting_measure(er_mat):.2f}')
+
+    torch.set_printoptions(precision=2)
+    print(ret_mat, '\n')
+    print(no_ret_mat, '\n')
+    print(reg_mat, '\n')
+    print(er_mat, '\n')

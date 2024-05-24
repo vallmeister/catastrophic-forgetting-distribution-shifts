@@ -65,7 +65,7 @@ class ExperienceReplay(torch.nn.Module):
         # setup memories
         self.current_task = -1
         self.buffer_node_ids = []
-        self.budget = 16
+        self.budget = 4
         self.aux_data = None
         self.aux_features = None
         self.aux_labels = None

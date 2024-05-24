@@ -212,24 +212,21 @@ class StructureCSBM(MultiClassCSBM):
 
         intra_class_mask = self.y == self.y[source]
         intra_class_mask[source] = False
-
         t_max = torch.max(self.t).item()
-        total = sum(1 / t for t in range(1, t_max + 1))
 
         for t in range(t_max):
             t_mask = self.t == t
-            self.set_edges(intra_class_mask & t_mask, int(n_hom / (t + 1) / total), source)
+            self.set_edges(intra_class_mask & t_mask, int(n_hom / 2 ** t), source)
 
     def generate_heterophile_edges(self, source):
         n_het = np.random.binomial(self.n, self.q_het)
         inter_class_mask = self.y != self.y[source]
 
         t_max = torch.max(self.t).item()
-        total = sum(1 / t for t in range(1, t_max + 1))
 
         for t in range(t_max):
             t_mask = self.t == t
-            self.set_edges(inter_class_mask & t_mask, int(n_het / (t + 1) / total), source)
+            self.set_edges(inter_class_mask & t_mask, int(n_het / 2 ** t), source)
 
 
 class ClassCSBM(MultiClassCSBM):
