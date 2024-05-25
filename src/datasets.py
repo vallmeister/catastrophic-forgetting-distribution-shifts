@@ -38,24 +38,17 @@ def get_dblp_tasks():
     """
     data_list = []
     dblp = get_dblp()
-
-    observed_classes = sorted(torch.unique(dblp.y[dblp.node_year <= 2004]).tolist())
-    all_classes = torch.unique(dblp.y).tolist()
-    unobserved_classes = list(sorted(set(all_classes) - set(observed_classes)))
-    label_map = {c: i for i, c in enumerate(observed_classes)} | {c: i + len(observed_classes) for i, c in
-                                                                  enumerate(unobserved_classes)}
-    dblp.y.apply_(lambda x: label_map[x])
+    class_mask = torch.zeros(dblp.x.size(0), dtype=torch.bool)
+    for cls in sorted(torch.unique(dblp.y[dblp.node_year <= 2004]).tolist()):
+        class_mask |= (dblp.y == cls).squeeze()
+    dblp = dblp.subgraph(class_mask)
 
     for year in range(2004, 2016):
         year_mask = (dblp.node_year <= year).squeeze()
         subgraph = dblp.subgraph(year_mask)
-
         node_mask = (subgraph.node_year <= year).squeeze() if year == 2004 else (subgraph.node_year == year).squeeze()
-        class_mask = torch.zeros_like(node_mask, dtype=torch.bool)
-        for c in range(len(observed_classes)):
-            class_mask |= (subgraph.y == c).squeeze()
+        train, val, test = get_mask(node_mask, seed=0)
 
-        train, val, test = get_mask(node_mask & class_mask, seed=0)
         subgraph.train_mask = train
         subgraph.val_mask = val
         subgraph.test_mask = test
