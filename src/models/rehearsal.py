@@ -109,7 +109,6 @@ class ExperienceReplay(torch.nn.Module):
             self.buffer_node_ids.extend(torch.where(all_node_mask)[0].tolist())
 
             if t > 0:
-                # self.aux_data = data.subgraph(torch.tensor(self.buffer_node_ids, dtype=torch.long).to(dev))
                 self.aux_data = data.clone()
                 self.aux_features, self.aux_labels = self.aux_data.x, self.aux_data.y
                 n_per_cls = [(self.aux_labels == j).sum() for j in range(self.num_classes)]

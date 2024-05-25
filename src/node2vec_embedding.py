@@ -68,6 +68,6 @@ def get_node2vec_embedding(data, p, q, length=80, k=10):
         loss = train()
         acc = test()
         if epoch % 20 == 0:
-            logger.info(f'Epoch: {epoch:03d}, Loss: {loss:.3f}, Accuracy: {acc:.3f}')
+            logger.info(f'Epoch: {epoch:03d}, Loss: {loss:.2f}, Accuracy: {acc:.2f}')
 
     return model.embedding.weight.cpu().detach().numpy()
