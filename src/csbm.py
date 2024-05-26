@@ -211,9 +211,8 @@ class StructureCSBM(MultiClassCSBM):
 
         intra_class_mask = self.y == self.y[source]
         intra_class_mask[source] = False
-        t_max = torch.max(self.t).item()
 
-        for t in range(t_max + 1):
+        for t in torch.unique(self.t).tolist():
             t_mask = self.t == t
             self.set_edges(intra_class_mask & t_mask, int(n_hom / 2 ** t), source)
 
@@ -221,9 +220,7 @@ class StructureCSBM(MultiClassCSBM):
         n_het = np.random.binomial(self.n, self.q_het)
         inter_class_mask = self.y != self.y[source]
 
-        t_max = torch.max(self.t).item()
-
-        for t in range(t_max + 1):
+        for t in torch.unique(self.t).tolist():
             t_mask = self.t == t
             self.set_edges(inter_class_mask & t_mask, int(n_het / 2 ** t), source)
 

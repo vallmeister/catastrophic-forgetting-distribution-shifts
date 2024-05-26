@@ -42,6 +42,8 @@ def get_dblp_tasks():
     for cls in sorted(torch.unique(dblp.y[dblp.node_year <= 2004]).tolist()):
         class_mask |= (dblp.y == cls).squeeze()
     dblp = dblp.subgraph(class_mask)
+    label_map = {cls: idx for idx, cls in enumerate(torch.unique(dblp.y).tolist())}
+    dblp.y.apply_(lambda x: label_map[x])
 
     for year in range(2004, 2016):
         year_mask = (dblp.node_year <= year).squeeze()
