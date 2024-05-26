@@ -190,7 +190,7 @@ class FeatureCSBM(MultiClassCSBM):
 
 class StructureCSBM(MultiClassCSBM):
 
-    def __init__(self, n=5000, class_distribution=None, means=None, q_hom=0.005, q_het=0.005, sigma_square=0.1,
+    def __init__(self, n=5000, class_distribution=None, means=None, q_hom=0.005, q_het=0.001, sigma_square=0.1,
                  classes=16, dimensions=128):
         self.max_degree = 1
         super().__init__(n,

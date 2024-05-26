@@ -22,7 +22,7 @@ def get_structure_shift(csbm, p1, q1):
         split_static_csbm(csbm)
         logger.info(f'Added artificial split for static CSBM')
     structure_shift = []
-    embedding = get_node2vec_embedding(csbm, p1, q1)
+    embedding = get_node2vec_embedding(csbm, p1, q1, 160, 20)
     x = embedding[csbm.t == 0]
     for task in range(10):
         z = embedding[csbm.t == task]
