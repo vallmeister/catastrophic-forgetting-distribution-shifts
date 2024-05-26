@@ -190,9 +190,8 @@ class FeatureCSBM(MultiClassCSBM):
 
 class StructureCSBM(MultiClassCSBM):
 
-    def __init__(self, n=5000, class_distribution=None, means=None, q_hom=0.005, q_het=0.001, sigma_square=0.1,
+    def __init__(self, n=5000, class_distribution=None, means=None, q_hom=0.0005, q_het=0.0001, sigma_square=0.1,
                  classes=16, dimensions=128):
-        self.max_degree = 1
         super().__init__(n,
                          class_distribution,
                          means,
@@ -214,7 +213,7 @@ class StructureCSBM(MultiClassCSBM):
         intra_class_mask[source] = False
         t_max = torch.max(self.t).item()
 
-        for t in range(t_max):
+        for t in range(t_max + 1):
             t_mask = self.t == t
             self.set_edges(intra_class_mask & t_mask, int(n_hom / 2 ** t), source)
 
@@ -224,7 +223,7 @@ class StructureCSBM(MultiClassCSBM):
 
         t_max = torch.max(self.t).item()
 
-        for t in range(t_max):
+        for t in range(t_max + 1):
             t_mask = self.t == t
             self.set_edges(inter_class_mask & t_mask, int(n_het / 2 ** t), source)
 
