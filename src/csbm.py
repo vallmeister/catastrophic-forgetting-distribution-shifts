@@ -190,7 +190,7 @@ class FeatureCSBM(MultiClassCSBM):
 
 class StructureCSBM(MultiClassCSBM):
 
-    def __init__(self, n=5000, class_distribution=None, means=None, q_hom=0.0005, q_het=0.0001, sigma_square=0.1,
+    def __init__(self, n=5000, class_distribution=None, means=None, q_hom=0.001, q_het=0.0005, sigma_square=0.1,
                  classes=16, dimensions=128):
         super().__init__(n,
                          class_distribution,
@@ -202,8 +202,8 @@ class StructureCSBM(MultiClassCSBM):
                          dimensions)
 
     def evolve(self):
-        self.q_hom *= 1.2
-        self.q_het *= 1.2
+        self.q_hom *= 1.1
+        self.q_het *= 1.1
         super().evolve()
 
     def generate_homophile_edges(self, source):
