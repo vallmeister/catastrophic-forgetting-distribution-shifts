@@ -31,7 +31,7 @@ def evaluate(model, data, f1=False):
 
 if __name__ == "__main__":
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    data_list = torch.load("data/csbm/feat_08.pt")
+    data_list = torch.load("data/real_world/dblp_tasks.pt")
     num_features = data_list[0].x.size(1)
     num_classes = torch.unique(data_list[0].y[data_list[0].train_mask]).numel()
     t = len(data_list)
