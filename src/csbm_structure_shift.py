@@ -2,11 +2,11 @@ import csv
 import logging
 import os
 
+import numpy as np
 import pandas as pd
 import torch
-import numpy as np
 
-from csbm import CSBM_NAMES, split_static_csbm
+from csbm import CSBM_NAMES
 from measures import mmd_max_rbf
 from node2vec_embedding import PARAMETERS, get_node2vec_embedding
 
@@ -18,9 +18,6 @@ logging.basicConfig(filename='log.log',
 
 
 def get_structure_shift(csbm, p1, q1):
-    if len(torch.unique(csbm.t)) == 1:
-        split_static_csbm(csbm)
-        logger.info(f'Added artificial split for static CSBM')
     structure_shift = []
     embedding = get_node2vec_embedding(csbm, p1, q1)
     x = embedding[csbm.t == 0]
@@ -40,9 +37,11 @@ if __name__ == "__main__":
         with open(file_path, 'w', newline='') as file:
             csv.DictWriter(file, fieldnames=fieldnames).writeheader()
 
-    for i in range(1):
+    for i in range(2):
         for p in PARAMETERS:
             for q in PARAMETERS:
+                if p in {4, 0.25} or q in {4, 0.25}:
+                    continue
                 for dataset in CSBM_NAMES:
                     name = f'{dataset}_{i:02d}'
                     npy_name = f'./structure_shifts/{name}_{str(p).replace(".", "")}_{str(q).replace(".", "")}.npy'
