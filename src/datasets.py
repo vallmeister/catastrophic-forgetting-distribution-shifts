@@ -22,6 +22,13 @@ def get_dblp():
     data.y = torch.tensor(y, dtype=torch.long)
     data.node_year = torch.tensor(node_year, dtype=torch.long)
 
+    class_mask = torch.zeros(data.x.size(0), dtype=torch.bool)
+    for cls in sorted(torch.unique(data.y[data.node_year <= 2004]).tolist()):
+        class_mask |= (data.y == cls).squeeze()
+    data = data.subgraph(class_mask)
+    label_map = {cls: idx for idx, cls in enumerate(torch.unique(data.y).tolist())}
+    data.y.apply_(lambda x: label_map[x])
+
     return data
 
 
@@ -38,12 +45,6 @@ def get_dblp_tasks():
     """
     data_list = []
     dblp = get_dblp()
-    class_mask = torch.zeros(dblp.x.size(0), dtype=torch.bool)
-    for cls in sorted(torch.unique(dblp.y[dblp.node_year <= 2004]).tolist()):
-        class_mask |= (dblp.y == cls).squeeze()
-    dblp = dblp.subgraph(class_mask)
-    label_map = {cls: idx for idx, cls in enumerate(torch.unique(dblp.y).tolist())}
-    dblp.y.apply_(lambda x: label_map[x])
 
     for year in range(2004, 2016):
         year_mask = (dblp.node_year <= year).squeeze()
