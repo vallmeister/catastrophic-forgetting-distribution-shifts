@@ -22,9 +22,11 @@ class GCN(torch.nn.Module):
 
     def observe(self, data, task):
         self.opt.zero_grad()
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         train_mask = data.train_mask
+        data = data.clone().subgraph(train_mask).to(device)
         out = self(data)
-        loss = F.nll_loss(out[train_mask], data.y[train_mask])
+        loss = F.nll_loss(out, data.y)
         loss.backward()
         self.opt.step()
         return loss

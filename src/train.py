@@ -31,7 +31,7 @@ def evaluate(model, data, f1=False):
 
 if __name__ == "__main__":
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    data_list = torch.load("data/real_world/dblp_tasks.pt")
+    data_list = torch.load("data/csbm/feat_04.pt")
     num_features = data_list[0].x.size(1)
     num_classes = torch.unique(data_list[0].y[data_list[0].train_mask]).numel()
     t = len(data_list)
@@ -77,3 +77,25 @@ if __name__ == "__main__":
     print(no_ret_mat, '\n')
     print(reg_mat, '\n')
     print(er_mat, '\n')
+    torch.save(no_ret_mat, "gcn_without.pt")
+    torch.save(ret_mat, "gcn_gll.pt")
+
+    full_graph = data_list[-1]
+    train_mask = torch.zeros(full_graph.x.size(0), dtype=torch.bool)
+    val_mask = torch.zeros(full_graph.x.size(0), dtype=torch.bool)
+    test_mask = torch.zeros(full_graph.x.size(0), dtype=torch.bool)
+    for data in data_list:
+        indices = torch.where(data.train_mask)[0]
+        train_mask[indices] = True
+
+        indices = torch.where(data.val_mask)[0]
+        val_mask[indices] = True
+
+        indices = torch.where(data.test_mask)[0]
+        test_mask[indices] = True
+    full_graph.train_mask = train_mask
+    full_graph.val_mask = val_mask
+    full_graph.test_mask = test_mask
+    gcn = GCN(num_features, num_classes).to(device)
+    result = []
+    train(gcn,full_graph,0,False)
