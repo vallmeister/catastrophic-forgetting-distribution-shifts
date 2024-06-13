@@ -31,7 +31,7 @@ def evaluate(model, data, f1=False):
 
 if __name__ == "__main__":
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    data_list = torch.load("data/csbm/feat_04.pt")
+    data_list = torch.load("data/csbm/hom_04.pt.pt")
     num_features = data_list[0].x.size(1)
     num_classes = torch.unique(data_list[0].y[data_list[0].train_mask]).numel()
     t = len(data_list)
@@ -39,25 +39,20 @@ if __name__ == "__main__":
     gcn_ret = GCN(num_features, num_classes).to(device)
     ret_mat = torch.empty((t, t), dtype=torch.float)
 
-    gcn_no_ret = GCN(num_features, num_classes).to(device)
-    no_ret_mat = torch.empty((t, t), dtype=torch.float)
-
     reg_gcn = Twp(GCN(num_features, num_classes).to(device))
     reg_mat = torch.empty((t, t), dtype=torch.float)
 
     er_gcn = ExperienceReplay(GCN(num_features, num_classes).to(device), num_classes)
     er_mat = torch.empty((t, t), dtype=torch.float)
 
-    gcn_list = [gcn_ret, gcn_no_ret, reg_gcn, er_gcn]
-    matrix_list = [ret_mat, no_ret_mat, reg_mat, er_mat]
+    gcn_list = [gcn_ret, reg_gcn, er_gcn]
+    matrix_list = [ret_mat, reg_mat, er_mat]
 
     for i, data_i in enumerate(data_list):
         for k in range(len(gcn_list)):
             gcn = gcn_list[k]
             matrix = matrix_list[k]
-            ep = -1
-            if k != 1 or k == 1 and i == 0:
-                ep = train(gcn, data_i.clone().to(device), i)
+            ep = train(gcn, data_i.clone().to(device), i)
             print(f'Early stopped after {ep} epochs')
 
             for j, data_j in enumerate(data_list):
@@ -65,8 +60,6 @@ if __name__ == "__main__":
         print()
     print("GCN".ljust(20), '|', f'AP: {get_average_accuracy(ret_mat, ):.2f}', '|',
           f'AF:{get_average_forgetting_measure(ret_mat):.2f}')
-    print("GCN cold".ljust(20), '|', f'AP: {get_average_accuracy(no_ret_mat):.2f}', '|',
-          f'AF:{get_average_forgetting_measure(no_ret_mat):.2f}')
     print("Regularization".ljust(20), '|', f'AP: {get_average_accuracy(reg_mat):.2f}', '|',
           f'AF:{get_average_forgetting_measure(reg_mat):.2f}')
     print("Experience Replay".ljust(20), '|', f'AP: {get_average_accuracy(er_mat):.2f}', '|',
@@ -74,10 +67,8 @@ if __name__ == "__main__":
 
     torch.set_printoptions(precision=2)
     print(ret_mat, '\n')
-    print(no_ret_mat, '\n')
     print(reg_mat, '\n')
     print(er_mat, '\n')
-    torch.save(no_ret_mat, "gcn_without.pt")
     torch.save(ret_mat, "gcn_gll.pt")
 
     full_graph = data_list[-1]
@@ -98,4 +89,4 @@ if __name__ == "__main__":
     full_graph.test_mask = test_mask
     gcn = GCN(num_features, num_classes).to(device)
     result = []
-    train(gcn,full_graph,0,False)
+    train(gcn, full_graph, 0, False)
